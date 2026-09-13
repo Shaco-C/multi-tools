@@ -34,6 +34,6 @@ value class Money private constructor(val cents: Long) {
             return Money(cents)
         }
 
-        private val DECIMAL_PATTERN = Regex("^\\d+(?:\\.\\d{1,2})?$")
+        private val DECIMAL_PATTERN = Regex("^\\d+(?:\\.\\d+)?$")
     }
 }

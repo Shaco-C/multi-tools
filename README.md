@@ -1,5 +1,7 @@
 # multi-tools
 
+> 2026-09-13 本机已完成首次 Android 构建：56 项 JVM 测试通过，debug APK 已生成。Windows 请从英文路径 `D:\Program\multi-tools\android_app` 打开。环境路径、已知限制和设备验收步骤见[本机开发准备](docs/本机Android开发准备-20260913.md)。下方旧交付状态以该记录更新为准。
+
 随身工具箱：离线优先的原生 Android 多功能工具集合。正式路线为 Kotlin + Jetpack Compose，首个工具为电费分摊。
 
 ## 目录

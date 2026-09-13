@@ -1,5 +1,7 @@
 # 随身工具箱 · Android
 
+> 2026-09-13 本机已完成首次 Android 构建：56 项 JVM 测试通过，debug APK 已生成。Windows 请从英文路径 `D:\Program\multi-tools\android_app` 打开。环境路径、已知限制和设备验收步骤见[本机开发准备](../docs/本机Android开发准备-20260913.md)。下方旧交付状态以该记录更新为准。
+
 这是“随身工具箱”的原生 Android 多模块工程，界面以仓库中的 `prototype` 交互原型为标准。
 
 ## 当前进度
