@@ -4,7 +4,9 @@
         android:name=".app.PocketToolboxApplication"
         android:allowBackup="false"
         android:fullBackupContent="false"
+        android:icon="@mipmap/ic_launcher"
         android:label="随身工具箱"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.PocketToolbox"
         android:usesCleartextTraffic="false">
