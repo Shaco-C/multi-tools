@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -35,9 +36,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pockettoolbox.core.designsystem.ToolboxColors
+import com.pockettoolbox.core.designsystem.ToolboxPalette
 import com.pockettoolbox.core.navigation.ToolEntry
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -47,6 +50,8 @@ import java.util.Locale
 fun ToolboxHomeScreen(
     tools: List<ToolEntry>,
     onOpenTool: (String) -> Unit,
+    palette: ToolboxPalette,
+    onPaletteChange: (ToolboxPalette) -> Unit,
 ) {
     val featured = tools.firstOrNull()
     Box(
@@ -64,6 +69,11 @@ fun ToolboxHomeScreen(
                 .padding(horizontal = 18.dp, vertical = 20.dp),
         ) {
             HomeHeader()
+            AppearanceCard(
+                palette = palette,
+                onPaletteChange = onPaletteChange,
+                modifier = Modifier.padding(top = 18.dp),
+            )
             featured?.let { tool ->
                 FeaturedToolCard(
                     tool = tool,
@@ -94,6 +104,54 @@ fun ToolboxHomeScreen(
             TipCard(modifier = Modifier.padding(top = 18.dp))
         }
     }
+}
+
+@Composable
+private fun AppearanceCard(
+    palette: ToolboxPalette,
+    onPaletteChange: (ToolboxPalette) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    ) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 13.dp)) {
+            Text("背景主题", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+            Text(
+                "选择高对比度浅色背景，设置会自动保存",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 7.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                PaletteOption("清爽", ToolboxPalette.Fresh, palette, onPaletteChange, Modifier.weight(1f))
+                PaletteOption("暖白", ToolboxPalette.Warm, palette, onPaletteChange, Modifier.weight(1f))
+                PaletteOption("纯白", ToolboxPalette.White, palette, onPaletteChange, Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun PaletteOption(
+    label: String,
+    value: ToolboxPalette,
+    selected: ToolboxPalette,
+    onSelected: (ToolboxPalette) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    FilterChip(
+        selected = selected == value,
+        onClick = { onSelected(value) },
+        label = { Text(label, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) },
+        modifier = modifier,
+    )
 }
 
 @Composable

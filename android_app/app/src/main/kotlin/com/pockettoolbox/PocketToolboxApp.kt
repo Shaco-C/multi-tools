@@ -6,13 +6,17 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.pockettoolbox.core.designsystem.ToolboxPalette
 import com.pockettoolbox.core.navigation.ToolModule
 import com.pockettoolbox.feature.electricity.ElectricityModule
 
 private const val HomeRoute = "home"
 
 @Composable
-fun PocketToolboxApp() {
+fun PocketToolboxApp(
+    palette: ToolboxPalette,
+    onPaletteChange: (ToolboxPalette) -> Unit,
+) {
     val navController = rememberNavController()
     val application = LocalContext.current.applicationContext as PocketToolboxApplication
     val modules: List<ToolModule> = remember(application) {
@@ -33,6 +37,8 @@ fun PocketToolboxApp() {
             ToolboxHomeScreen(
                 tools = modules.map { it.entry },
                 onOpenTool = { route -> navController.navigate(route) },
+                palette = palette,
+                onPaletteChange = onPaletteChange,
             )
         }
         modules.forEach { module ->

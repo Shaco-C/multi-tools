@@ -31,14 +31,20 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.pockettoolbox.core.designsystem.ToolboxColors
 import com.pockettoolbox.feature.electricity.domain.ElectricityBillRepository
@@ -193,6 +199,14 @@ private fun TrendChartCard(allPoints: List<ElectricityTrendPoint>) {
     val lineColor = ToolboxColors.Teal
     val dotColor = ToolboxColors.TealBright
     val gridColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
+    val labelColor = MaterialTheme.colorScheme.onSurface
+    val labelBackground = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f)
+    val textMeasurer = rememberTextMeasurer()
+    val labelStyle = TextStyle(
+        color = labelColor,
+        fontSize = 10.sp,
+        fontWeight = FontWeight.Bold,
+    )
     val description = points.joinToString("，") {
         "${it.billingMonth.year}年${it.billingMonth.monthValue}月${it.ownerAmount.formatYuan()}元"
     }
@@ -220,9 +234,10 @@ private fun TrendChartCard(allPoints: List<ElectricityTrendPoint>) {
                 val firstMonth = points.first().billingMonth
                 val monthSpan = ChronoUnit.MONTHS.between(firstMonth, points.last().billingMonth).coerceAtLeast(1L)
                 val horizontalInset = 8.dp.toPx()
-                val verticalInset = 12.dp.toPx()
+                val verticalInset = 38.dp.toPx()
+                val bottomInset = 12.dp.toPx()
                 val plotWidth = size.width - horizontalInset * 2
-                val plotHeight = size.height - verticalInset * 2
+                val plotHeight = size.height - verticalInset - bottomInset
 
                 repeat(3) { index ->
                     val y = verticalInset + plotHeight * index / 2f
@@ -250,9 +265,30 @@ private fun TrendChartCard(allPoints: List<ElectricityTrendPoint>) {
                         drawLine(lineColor, position(start), position(end), strokeWidth = 3.dp.toPx(), cap = StrokeCap.Round)
                     }
                 }
-                points.forEach { point ->
-                    drawCircle(color = dotColor, radius = 5.dp.toPx(), center = position(point))
-                    drawCircle(color = lineColor, radius = 2.dp.toPx(), center = position(point))
+                points.forEachIndexed { index, point ->
+                    val center = position(point)
+                    drawCircle(color = dotColor, radius = 5.dp.toPx(), center = center)
+                    drawCircle(color = lineColor, radius = 2.dp.toPx(), center = center)
+
+                    val label = textMeasurer.measure(point.ownerAmount.formatYuan(), style = labelStyle)
+                    val horizontalPadding = 4.dp.toPx()
+                    val verticalPadding = 2.dp.toPx()
+                    val labelLeft = (center.x - label.size.width / 2f).coerceIn(
+                        horizontalPadding,
+                        (size.width - label.size.width - horizontalPadding).coerceAtLeast(horizontalPadding),
+                    )
+                    val stagger = if (index % 2 == 0) 8.dp.toPx() else 25.dp.toPx()
+                    val labelTop = (center.y - label.size.height - stagger).coerceAtLeast(verticalPadding)
+                    drawRoundRect(
+                        color = labelBackground,
+                        topLeft = Offset(labelLeft - horizontalPadding, labelTop - verticalPadding),
+                        size = Size(
+                            label.size.width + horizontalPadding * 2,
+                            label.size.height + verticalPadding * 2,
+                        ),
+                        cornerRadius = CornerRadius(5.dp.toPx()),
+                    )
+                    drawText(label, topLeft = Offset(labelLeft, labelTop))
                 }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
