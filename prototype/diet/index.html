@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>饮食不适记录 · 随身工具箱</title>
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<aside class="rail"><button class="logo" data-tab="record" aria-label="返回记录"><i data-icon="tool"></i></button><span class="rail-name">随身工具箱</span><nav><button data-tab="record"><i data-icon="plus"></i>记录</button><button data-tab="brands"><i data-icon="grid"></i>品牌</button><button data-tab="stats"><i data-icon="chart"></i>统计</button><button data-tab="manage"><i data-icon="settings"></i>管理</button></nav><div class="rail-foot"><i data-icon="shield"></i><span>数据留在本机</span></div></aside>
+<main>
+<header class="topbar"><div class="breadcrumb">随身工具箱 <span>/</span> 饮食不适记录</div><button class="quiet" id="reset"><i data-icon="refresh"></i>重置示例</button></header>
+<section class="page-heading"><div><p class="eyebrow">FOOD & FEELINGS</p><h1>饮食不适记录<span class="prototype">交互原型</span></h1><p class="muted">只记不舒服的那一餐，给下次点餐留个提醒。</p></div><button class="primary" id="newMeal"><i data-icon="plus"></i>记录一次不适</button></section>
+<div class="mobile-tabs"><button data-tab="record">记录</button><button data-tab="brands">品牌</button><button data-tab="stats">统计</button><button data-tab="manage">管理</button></div>
+<div class="demo-note"><span class="demo-dot"></span>当前含示例数据 · 可试点记录、撤销与修改，变更仅保存在此浏览器。</div>
+<div id="view"></div>
+<footer>随身工具箱 <span>·</span> 记录餐后感受，帮助回顾饮食经历</footer>
+</main>
+<div id="toast" role="status" aria-live="polite" hidden></div>
+<dialog id="mealDialog" aria-labelledby="mealTitle"><form id="mealForm"><div class="dialog-head"><div><p class="eyebrow">REMEMBER THIS MEAL</p><h2 id="mealTitle">记下这次不适</h2></div><button type="button" class="icon-btn" data-close="mealDialog" aria-label="关闭"><i data-icon="close"></i></button></div><p class="muted">只记出现不适的饮食。品牌与类型直接选，不用重复填。</p><div class="captured-time"><i data-icon="clock"></i><span id="capturedAt"></span></div><label>品牌<select name="brandId" required></select></label><label>食品<select name="foodId" required></select></label><div class="inline-manage"><button type="button" class="link-button" id="manageFromForm">没找到？去管理品牌 / 食品 / 类型 →</button></div><div class="date-field"><label for="eatenDate">进食日期</label><div class="date-shortcuts"><button type="button" data-date="0">今天</button><button type="button" data-date="1">昨天</button><button type="button" data-date="2">前天</button></div><input id="eatenDate" name="date" type="date" required></div><label id="firstTypeLabel">不适类型<select name="typeId" required></select></label><label>备注 <span class="muted">选填</span><input name="note" maxlength="120" placeholder="例如：十翅一桶，晚上吃的"></label><div id="mealHint" class="history-hint"></div><p id="mealError" class="form-error" role="alert"></p><button id="mealSubmit" class="primary full" type="submit"><i data-icon="check"></i>保存这次不适</button></form></dialog>
+<dialog id="eventDialog" aria-labelledby="eventTitle"><form id="eventForm"><div class="dialog-head"><h2 id="eventTitle">修改不适记录</h2><button type="button" class="icon-btn" data-close="eventDialog" aria-label="关闭"><i data-icon="close"></i></button></div><label>不适类型<select name="typeId" required></select></label><label>发生时间<input type="datetime-local" name="at" required></label><div class="form-hint">一键记录会自动记时间，这里可以修正。</div><p id="eventError" class="form-error" role="alert"></p><button type="submit" class="primary full">保存修改</button></form></dialog>
+<dialog id="catalogDialog" aria-labelledby="catalogTitle"><form id="catalogForm"><div class="dialog-head"><h2 id="catalogTitle">新增品牌</h2><button type="button" class="icon-btn" data-close="catalogDialog" aria-label="关闭"><i data-icon="close"></i></button></div><label><span id="catalogLabel">品牌名称</span><input name="name" maxlength="40" required placeholder="填写一次，以后直接选择"></label><p id="catalogHelp" class="form-hint"></p><p id="catalogError" class="form-error" role="alert"></p><button type="submit" class="primary full">保存</button></form></dialog>
+<script type="module" src="./ui.js"></script>
+</body></html>

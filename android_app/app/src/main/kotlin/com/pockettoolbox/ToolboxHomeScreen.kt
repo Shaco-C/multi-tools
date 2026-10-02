@@ -350,7 +350,7 @@ private fun TipCard(modifier: Modifier = Modifier) {
         Column(Modifier.padding(start = 13.dp)) {
             Text("小提示", color = Color(0xFF086E68), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
             Text(
-                "账单只保存在本机；记录和趋势由电费工具独立管理。",
+                "数据只保存在本机；电费和饮食不适记录分别管理、分别备份。",
                 color = Color(0xFF466A6C),
                 style = MaterialTheme.typography.bodySmall,
             )

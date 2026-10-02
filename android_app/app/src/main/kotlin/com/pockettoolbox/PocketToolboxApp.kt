@@ -9,6 +9,7 @@ import androidx.navigation.compose.rememberNavController
 import com.pockettoolbox.core.designsystem.ToolboxPalette
 import com.pockettoolbox.core.navigation.ToolModule
 import com.pockettoolbox.feature.electricity.ElectricityModule
+import com.pockettoolbox.feature.diet.DietModule
 
 private const val HomeRoute = "home"
 
@@ -26,6 +27,7 @@ fun PocketToolboxApp(
                 backupContributor = application.electricityDependencies.backupContributor,
                 csvExporter = application.electricityDependencies.csvExporter,
             ),
+            DietModule(application.dietDependencies.repository),
         )
     }
 
