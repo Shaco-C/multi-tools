@@ -19,7 +19,7 @@
 
 前往 [GitHub Releases](https://github.com/Shaco-C/multi-tools/releases/latest) 下载最新正式版 APK。应用最低支持 Android 8.0（API 26）。
 
-饮食不适工具为 v1.1.0 新增功能，发布前请以 Release 页面列出的版本和功能为准。
+当前正式版 **v1.1.0**，新增饮食不适记录与独立备份恢复。可直接 [下载正式版 APK](https://github.com/Shaco-C/multi-tools/releases/download/v1.1.0/multi-tools-v1.1.0.apk)，或查看 [本版更新说明](https://github.com/Shaco-C/multi-tools/releases/tag/v1.1.0)。沿用 v1.0.0 正式版签名，可覆盖升级并保留本机数据。
 
 ## 已有功能
 
