@@ -1,0 +1,58 @@
+{
+  "source": "free-exercise-db",
+  "repository": "https://github.com/yuhonas/free-exercise-db",
+  "revision": "f00c92c7dcf1216a928a52c3706c7ce8e2f71ed5",
+  "acquiredAt": "2026-10-24T06:01:18.026Z",
+  "licenseDeclaredBySource": "Unlicense",
+  "licenseFile": "LICENSE.source.md",
+  "licenseUrl": "https://github.com/yuhonas/free-exercise-db/blob/f00c92c7dcf1216a928a52c3706c7ce8e2f71ed5/LICENSE.md",
+  "exerciseCount": 876,
+  "imageReferences": 1746,
+  "uniqueImagesDownloaded": 1746,
+  "imageBytes": 98671281,
+  "sourceIssues": [
+    {
+      "sourceId": "Iron_Cross",
+      "issue": "missing-instructions"
+    },
+    {
+      "sourceId": "Kettlebell_Halo",
+      "issue": "missing-images"
+    },
+    {
+      "sourceId": "Kettlebell_Halo_With_Overhead_Extension",
+      "issue": "missing-images"
+    },
+    {
+      "sourceId": "Kettlebell_Overhead_Triceps_Extension",
+      "issue": "missing-images"
+    },
+    {
+      "sourceId": "One-Arm_Kettlebell_Swings",
+      "issue": "missing-instructions"
+    },
+    {
+      "sourceId": "Push_Press",
+      "issue": "missing-instructions"
+    },
+    {
+      "sourceId": "Side_Bridge",
+      "issue": "missing-instructions"
+    },
+    {
+      "sourceId": "Side_Jackknife",
+      "issue": "missing-instructions"
+    }
+  ],
+  "jsonSha256": "5bb747e3fc658f095a60dcbf6d53c96627acdcc6ffb6fffde86f7e26995d40bf",
+  "licenseSha256": "6b0382b16279f26ff69014300541967a356a666eb0b91b422f6862f6b7dad17e",
+  "localSourceCache": "prototype/dist/fitness-acquisition/free-exercise-db",
+  "sourceArchive": {
+    "path": "content/fitness/source-archives/free-exercise-db-f00c92c7dcf1216a928a52c3706c7ce8e2f71ed5.zip",
+    "bytes": 99702843,
+    "sha256": "3fad20f601ee50376781ecc41fcff9674ccaaff3427a4c397f472496e23a4982",
+    "retention": "local-backup-outside-build-cache-git-ignored"
+  },
+  "status": "source-acquired-not-matched-or-approved",
+  "note": "来源876条已全部进入处理范围，原250项覆盖仍需映射；图片校验只确认文件签名和固定来源完整性，不代表可解码、教学/解剖或逐图权利审核通过。完整原包另存source-archives，正式采用前另存对应原图至内容生产目录。"
+}
