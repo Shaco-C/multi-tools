@@ -64,6 +64,7 @@ dependencies {
     implementation(project(":core:navigation"))
     implementation(project(":feature:electricity"))
     implementation(project(":feature:diet"))
+    implementation(project(":feature:fitness"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

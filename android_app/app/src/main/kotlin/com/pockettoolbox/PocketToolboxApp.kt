@@ -10,6 +10,8 @@ import com.pockettoolbox.core.designsystem.ToolboxPalette
 import com.pockettoolbox.core.navigation.ToolModule
 import com.pockettoolbox.feature.electricity.ElectricityModule
 import com.pockettoolbox.feature.diet.DietModule
+import com.pockettoolbox.feature.fitness.FitnessFeatureDependencies
+import com.pockettoolbox.feature.fitness.FitnessModule
 
 private const val HomeRoute = "home"
 
@@ -21,14 +23,17 @@ fun PocketToolboxApp(
     val navController = rememberNavController()
     val application = LocalContext.current.applicationContext as PocketToolboxApplication
     val modules: List<ToolModule> = remember(application) {
-        listOf(
-            ElectricityModule(
-                repository = application.electricityDependencies.repository,
-                backupContributor = application.electricityDependencies.backupContributor,
-                csvExporter = application.electricityDependencies.csvExporter,
-            ),
-            DietModule(application.dietDependencies.repository),
-        )
+        buildList {
+            add(
+                ElectricityModule(
+                    repository = application.electricityDependencies.repository,
+                    backupContributor = application.electricityDependencies.backupContributor,
+                    csvExporter = application.electricityDependencies.csvExporter,
+                ),
+            )
+            add(DietModule(application.dietDependencies.repository))
+            if (FitnessFeatureDependencies.isEnabled) add(FitnessModule(application.fitnessDependencies))
+        }
     }
 
     NavHost(

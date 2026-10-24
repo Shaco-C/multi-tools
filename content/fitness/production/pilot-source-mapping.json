@@ -1,0 +1,16 @@
+{
+  "status": "candidate-correspondence-not-teaching-approval",
+  "mappings": {
+    "EX-CHE-001": "Pushups",
+    "EX-CHE-005": "Dumbbell_Floor_Press",
+    "EX-CHE-009": "Dumbbell_Flyes",
+    "EX-BAC-001": "One-Arm_Dumbbell_Row",
+    "EX-SHO-005": "Side_Lateral_Raise",
+    "EX-BIC-001": "Dumbbell_Bicep_Curl",
+    "EX-LEG-001": "Bodyweight_Squat",
+    "EX-GLU-001": "Butt_Lift_Bridge",
+    "EX-COR-009": "Plank",
+    "EX-AUX-006": "Inchworm",
+    "EX-MOB-003": "Kneeling_Hip_Flexor"
+  }
+}
