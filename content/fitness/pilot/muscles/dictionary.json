@@ -1,0 +1,127 @@
+{
+  "count": 15,
+  "next": null,
+  "previous": null,
+  "results": [
+    {
+      "id": 2,
+      "name": "Anterior deltoid",
+      "name_en": "Shoulders",
+      "is_front": true,
+      "image_url_main": "https://wger.de/static/images/muscles/main/muscle-2.e1e1205a3202.svg",
+      "image_url_secondary": "https://wger.de/static/images/muscles/secondary/muscle-2.74ea636ad97b.svg"
+    },
+    {
+      "id": 1,
+      "name": "Biceps brachii",
+      "name_en": "Biceps",
+      "is_front": true,
+      "image_url_main": "https://wger.de/static/images/muscles/main/muscle-1.8790f8a0b3b9.svg",
+      "image_url_secondary": "https://wger.de/static/images/muscles/secondary/muscle-1.e08c58a194b9.svg"
+    },
+    {
+      "id": 11,
+      "name": "Biceps femoris",
+      "name_en": "Hamstrings",
+      "is_front": false,
+      "image_url_main": "https://wger.de/static/images/muscles/main/muscle-11.54ef31755917.svg",
+      "image_url_secondary": "https://wger.de/static/images/muscles/secondary/muscle-11.a2bc76fe157a.svg"
+    },
+    {
+      "id": 13,
+      "name": "Brachialis",
+      "name_en": "",
+      "is_front": true,
+      "image_url_main": "https://wger.de/static/images/muscles/main/muscle-13.3fd85231b089.svg",
+      "image_url_secondary": "https://wger.de/static/images/muscles/secondary/muscle-13.0a7e5d52821b.svg"
+    },
+    {
+      "id": 7,
+      "name": "Gastrocnemius",
+      "name_en": "Calves",
+      "is_front": false,
+      "image_url_main": "https://wger.de/static/images/muscles/main/muscle-7.edbd8c381b0c.svg",
+      "image_url_secondary": "https://wger.de/static/images/muscles/secondary/muscle-7.2f836b0cd383.svg"
+    },
+    {
+      "id": 8,
+      "name": "Gluteus maximus",
+      "name_en": "Glutes",
+      "is_front": false,
+      "image_url_main": "https://wger.de/static/images/muscles/main/muscle-8.fbdfb46f3bc0.svg",
+      "image_url_secondary": "https://wger.de/static/images/muscles/secondary/muscle-8.605e4e1a0277.svg"
+    },
+    {
+      "id": 12,
+      "name": "Latissimus dorsi",
+      "name_en": "Lats",
+      "is_front": false,
+      "image_url_main": "https://wger.de/static/images/muscles/main/muscle-12.6a5de7a0e373.svg",
+      "image_url_secondary": "https://wger.de/static/images/muscles/secondary/muscle-12.974a8c6def63.svg"
+    },
+    {
+      "id": 14,
+      "name": "Obliquus externus abdominis",
+      "name_en": "",
+      "is_front": true,
+      "image_url_main": "https://wger.de/static/images/muscles/main/muscle-14.153978038d0b.svg",
+      "image_url_secondary": "https://wger.de/static/images/muscles/secondary/muscle-14.afd582849ae9.svg"
+    },
+    {
+      "id": 4,
+      "name": "Pectoralis major",
+      "name_en": "Chest",
+      "is_front": true,
+      "image_url_main": "https://wger.de/static/images/muscles/main/muscle-4.c9fa9a228bc8.svg",
+      "image_url_secondary": "https://wger.de/static/images/muscles/secondary/muscle-4.955e74ea6083.svg"
+    },
+    {
+      "id": 10,
+      "name": "Quadriceps femoris",
+      "name_en": "Quads",
+      "is_front": true,
+      "image_url_main": "https://wger.de/static/images/muscles/main/muscle-10.b1445ea1acf6.svg",
+      "image_url_secondary": "https://wger.de/static/images/muscles/secondary/muscle-10.55e36d852778.svg"
+    },
+    {
+      "id": 6,
+      "name": "Rectus abdominis",
+      "name_en": "Abs",
+      "is_front": true,
+      "image_url_main": "https://wger.de/static/images/muscles/main/muscle-6.592f938fa8c7.svg",
+      "image_url_secondary": "https://wger.de/static/images/muscles/secondary/muscle-6.370f77c2860e.svg"
+    },
+    {
+      "id": 3,
+      "name": "Serratus anterior",
+      "name_en": "",
+      "is_front": true,
+      "image_url_main": "https://wger.de/static/images/muscles/main/muscle-3.356ffc861a30.svg",
+      "image_url_secondary": "https://wger.de/static/images/muscles/secondary/muscle-3.4c09bf907827.svg"
+    },
+    {
+      "id": 15,
+      "name": "Soleus",
+      "name_en": "",
+      "is_front": false,
+      "image_url_main": "https://wger.de/static/images/muscles/main/muscle-15.ae8e305fc9e4.svg",
+      "image_url_secondary": "https://wger.de/static/images/muscles/secondary/muscle-15.9bdd8751b3e7.svg"
+    },
+    {
+      "id": 9,
+      "name": "Trapezius",
+      "name_en": "",
+      "is_front": false,
+      "image_url_main": "https://wger.de/static/images/muscles/main/muscle-9.b491050a7108.svg",
+      "image_url_secondary": "https://wger.de/static/images/muscles/secondary/muscle-9.be1b5e41906b.svg"
+    },
+    {
+      "id": 5,
+      "name": "Triceps brachii",
+      "name_en": "Triceps",
+      "is_front": false,
+      "image_url_main": "https://wger.de/static/images/muscles/main/muscle-5.8a2b934b5486.svg",
+      "image_url_secondary": "https://wger.de/static/images/muscles/secondary/muscle-5.68eb84d675a5.svg"
+    }
+  ]
+}

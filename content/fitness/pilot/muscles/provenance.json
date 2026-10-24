@@ -1,0 +1,117 @@
+{
+  "retrievedAt": "2026-10-23T03:15:15.758Z",
+  "sourceCommit": "48e02bfe45e83b87781058261986cda88ff2e6d5",
+  "sourcesFile": "https://raw.githubusercontent.com/wger-project/wger/48e02bfe45e83b87781058261986cda88ff2e6d5/wger/core/static/images/muscles/SOURCES",
+  "originals": [
+    "https://commons.wikimedia.org/wiki/File:Muscular_system.svg",
+    "https://commons.wikimedia.org/wiki/File:Muscular_system-back.svg"
+  ],
+  "attribution": "Original anatomy by Termininja; wger project adapted SVG layers. Candidate anatomy assets; attribution and derivative chain require final release review.",
+  "license": "CC BY-SA 3.0 original anatomy; preserve source references and share-alike derivative obligations.",
+  "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
+  "publicationStatus": "pilot-only-pending-review",
+  "assets": [
+    {
+      "file": "muscles/front.svg",
+      "source": "https://raw.githubusercontent.com/wger-project/wger/48e02bfe45e83b87781058261986cda88ff2e6d5/wger/core/static/images/muscles/muscular_system_front.svg",
+      "sha256": "3c2bb38e33d252aeb53a3c351e1b99a53cbf77d42ce149ec42e8acdd18c26343",
+      "bytes": 321118
+    },
+    {
+      "file": "muscles/back.svg",
+      "source": "https://raw.githubusercontent.com/wger-project/wger/48e02bfe45e83b87781058261986cda88ff2e6d5/wger/core/static/images/muscles/muscular_system_back.svg",
+      "sha256": "de2fd0c49a98b7e76e5b9958a1a303455e691382e6362440741d01f472458023",
+      "bytes": 404428
+    },
+    {
+      "file": "muscles/main-2.svg",
+      "source": "https://raw.githubusercontent.com/wger-project/wger/48e02bfe45e83b87781058261986cda88ff2e6d5/wger/core/static/images/muscles/main/muscle-2.svg",
+      "sha256": "f9e1028cbb332819cbff395baa5e4f3e90863e4365f7eafebd0b31283964b2a2",
+      "bytes": 2885
+    },
+    {
+      "file": "muscles/main-1.svg",
+      "source": "https://raw.githubusercontent.com/wger-project/wger/48e02bfe45e83b87781058261986cda88ff2e6d5/wger/core/static/images/muscles/main/muscle-1.svg",
+      "sha256": "cb5d79df6eb6b909377e9e7f08f8688a100e39a63d0811e96106d98c8418bab9",
+      "bytes": 2873
+    },
+    {
+      "file": "muscles/main-11.svg",
+      "source": "https://raw.githubusercontent.com/wger-project/wger/48e02bfe45e83b87781058261986cda88ff2e6d5/wger/core/static/images/muscles/main/muscle-11.svg",
+      "sha256": "25718426d8e8bf4b8caea61c2a7f70b8c8ef32ca617290811d84af8239347b21",
+      "bytes": 3001
+    },
+    {
+      "file": "muscles/main-13.svg",
+      "source": "https://raw.githubusercontent.com/wger-project/wger/48e02bfe45e83b87781058261986cda88ff2e6d5/wger/core/static/images/muscles/main/muscle-13.svg",
+      "sha256": "a4cee9c226df9291e5da1168b6eb5466ce57c8371e69dafe8907a9259d8e4185",
+      "bytes": 3489
+    },
+    {
+      "file": "muscles/main-7.svg",
+      "source": "https://raw.githubusercontent.com/wger-project/wger/48e02bfe45e83b87781058261986cda88ff2e6d5/wger/core/static/images/muscles/main/muscle-7.svg",
+      "sha256": "3442b013a35de933a1c44bfbc5d7f5e43ebbeb36c31db50fd62ffb503f8d3368",
+      "bytes": 3453
+    },
+    {
+      "file": "muscles/main-8.svg",
+      "source": "https://raw.githubusercontent.com/wger-project/wger/48e02bfe45e83b87781058261986cda88ff2e6d5/wger/core/static/images/muscles/main/muscle-8.svg",
+      "sha256": "95314179c8f0eb41f3b9433cfcc99a13861d3035bc272307796fd50056dc8001",
+      "bytes": 3524
+    },
+    {
+      "file": "muscles/main-12.svg",
+      "source": "https://raw.githubusercontent.com/wger-project/wger/48e02bfe45e83b87781058261986cda88ff2e6d5/wger/core/static/images/muscles/main/muscle-12.svg",
+      "sha256": "69df43a4dceb14b3be0929be4a32bdf2d7787d00680810aaabfc609dc29f4da1",
+      "bytes": 2887
+    },
+    {
+      "file": "muscles/main-14.svg",
+      "source": "https://raw.githubusercontent.com/wger-project/wger/48e02bfe45e83b87781058261986cda88ff2e6d5/wger/core/static/images/muscles/main/muscle-14.svg",
+      "sha256": "6d6ed1d16f217a34aa34bc5925d713ed39ce98e998b288ed76c6f17e9523ff8e",
+      "bytes": 2907
+    },
+    {
+      "file": "muscles/main-4.svg",
+      "source": "https://raw.githubusercontent.com/wger-project/wger/48e02bfe45e83b87781058261986cda88ff2e6d5/wger/core/static/images/muscles/main/muscle-4.svg",
+      "sha256": "7f724a979a937f374e161e5f7cc5049e479ea81914e3582548d3f84cc3027069",
+      "bytes": 3125
+    },
+    {
+      "file": "muscles/main-10.svg",
+      "source": "https://raw.githubusercontent.com/wger-project/wger/48e02bfe45e83b87781058261986cda88ff2e6d5/wger/core/static/images/muscles/main/muscle-10.svg",
+      "sha256": "fc54fad45e008cae0bb7bdd7e0b172b25787e9723b2c8a47bf38c44fb8dfa97c",
+      "bytes": 3020
+    },
+    {
+      "file": "muscles/main-6.svg",
+      "source": "https://raw.githubusercontent.com/wger-project/wger/48e02bfe45e83b87781058261986cda88ff2e6d5/wger/core/static/images/muscles/main/muscle-6.svg",
+      "sha256": "eb9e894e0f3266780827d5fc3d0671cc12e83d283716840e78cbf2a87034a181",
+      "bytes": 3543
+    },
+    {
+      "file": "muscles/main-3.svg",
+      "source": "https://raw.githubusercontent.com/wger-project/wger/48e02bfe45e83b87781058261986cda88ff2e6d5/wger/core/static/images/muscles/main/muscle-3.svg",
+      "sha256": "c01b2f7888e55d0d7aa575c50ee6ee665de47da34f4029e97ec9f751814d9892",
+      "bytes": 3261
+    },
+    {
+      "file": "muscles/main-15.svg",
+      "source": "https://raw.githubusercontent.com/wger-project/wger/48e02bfe45e83b87781058261986cda88ff2e6d5/wger/core/static/images/muscles/main/muscle-15.svg",
+      "sha256": "dbb460c766dcc8acddf3d35f4f7f21f0036cc5af7cc09dd1bd9f2f70fc4c47dd",
+      "bytes": 2604
+    },
+    {
+      "file": "muscles/main-9.svg",
+      "source": "https://raw.githubusercontent.com/wger-project/wger/48e02bfe45e83b87781058261986cda88ff2e6d5/wger/core/static/images/muscles/main/muscle-9.svg",
+      "sha256": "9191520dc9d13d297258a7ead05ce0af7108451ef8eabfbec9eefb94fd0e0c15",
+      "bytes": 2826
+    },
+    {
+      "file": "muscles/main-5.svg",
+      "source": "https://raw.githubusercontent.com/wger-project/wger/48e02bfe45e83b87781058261986cda88ff2e6d5/wger/core/static/images/muscles/main/muscle-5.svg",
+      "sha256": "299ca9f7cc98f49bf80a2c00950909663185ca9f0d8d45fab81e8e5d8ec2925b",
+      "bytes": 2822
+    }
+  ]
+}
