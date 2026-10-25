@@ -20,7 +20,11 @@ data class FitnessSourceExercise(
 data class FitnessCatalogDocument(
     val version: String, val sourceCount: Int, val reviewedCount: Int, val sourceRevision: String,
     val exercises: List<FitnessExercise>, val sourceRecords: List<FitnessSourceExercise>,
-)
+) {
+    val selectableExercises: List<FitnessExercise> by lazy {
+        exercises + sourceRecords.map { it.recordingExercise(sourceRevision) }
+    }
+}
 
 class FitnessCatalog(private val context: Context) {
     private val mutex = Mutex()
@@ -33,6 +37,8 @@ class FitnessCatalog(private val context: Context) {
                 require(document.exercises.map { it.id }.distinct().size == document.exercises.size) { "内置动作身份重复" }
                 require(document.reviewedCount == document.exercises.count { it.reviewed }) { "内容审核数量与条目不一致" }
                 document.exercises.forEach(FitnessRules::validateExercise)
+                document.selectableExercises.forEach(FitnessRules::validateExercise)
+                require(document.selectableExercises.map { it.id }.distinct().size == document.selectableExercises.size) { "可选动作身份重复" }
                 cached = document
             }
         }

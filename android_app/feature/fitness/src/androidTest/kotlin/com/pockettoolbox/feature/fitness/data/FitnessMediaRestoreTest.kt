@@ -17,7 +17,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** 真正使用Android图片解码与SQLite事务；需设备执行。 */
+/** Shared image/transaction tests; host execution uses Robolectric native graphics and SQLite. */
 @RunWith(AndroidJUnit4::class)
 class FitnessMediaRestoreTest {
     private lateinit var database: FitnessDatabase

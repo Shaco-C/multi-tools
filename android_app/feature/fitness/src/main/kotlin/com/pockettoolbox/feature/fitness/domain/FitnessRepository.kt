@@ -13,6 +13,7 @@ interface FitnessRepository {
     suspend fun itemEvents(itemId: String): List<FitnessSetEvent>
     suspend fun recentExercises(today: String): List<String>
     fun observeProgress(date: String, planId: String? = null): Flow<Map<String, Int>>
+    fun observeDailyCounts(filter: FitnessFilter): Flow<Map<String, Int>>
     fun observeSummary(filter: FitnessFilter): Flow<FitnessSummary>
     fun observeCounts(filter: FitnessFilter, byExercise: Boolean): Flow<List<FitnessCount>>
     fun observeTrainingDates(today: String): Flow<Set<String>>

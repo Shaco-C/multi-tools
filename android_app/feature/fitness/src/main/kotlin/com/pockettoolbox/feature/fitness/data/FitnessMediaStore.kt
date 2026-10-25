@@ -22,11 +22,11 @@ class FitnessMediaStore(private val root: File) {
 
     fun validateImage(file: File): String {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeFile(file.path, bounds)
+        file.inputStream().use { BitmapFactory.decodeStream(it, null, bounds) }
         require(bounds.outWidth > 0 && bounds.outHeight > 0 && bounds.outWidth.toLong() * bounds.outHeight <= 16_000_000) { "图片无法读取或像素过大" }
         val extension = when (bounds.outMimeType) { "image/jpeg" -> "jpg"; "image/png" -> "png"; "image/webp" -> "webp"; else -> throw IllegalArgumentException("只支持JPEG、PNG、WebP图片") }
         val options = BitmapFactory.Options().apply { inSampleSize = maxOf(1, maxOf(bounds.outWidth, bounds.outHeight) / 512) }
-        val decoded = requireNotNull(BitmapFactory.decodeFile(file.path, options)) { "图片解码失败" }
+        val decoded = requireNotNull(file.inputStream().use { BitmapFactory.decodeStream(it, null, options) }) { "图片解码失败" }
         decoded.recycle()
         return extension
     }
@@ -39,7 +39,8 @@ class FitnessMediaStore(private val root: File) {
             val extension = validateImage(temporary)
             val hash = FitnessArchive.sha256(temporary)
             val target = resolve(generation, "personal/$hash.$extension")
-            require(target.parentFile.isDirectory || target.parentFile.mkdirs()) { "个人媒体目录不可写" }
+            val parent = requireNotNull(target.parentFile)
+            require(parent.isDirectory || parent.mkdirs()) { "个人媒体目录不可写" }
             if (target.exists()) require(FitnessArchive.sha256(target) == hash) { "已有个人图片损坏" }
             else require(temporary.renameTo(target)) { "个人图片保存失败" }
             return FitnessImage("personal/$hash.$extension")

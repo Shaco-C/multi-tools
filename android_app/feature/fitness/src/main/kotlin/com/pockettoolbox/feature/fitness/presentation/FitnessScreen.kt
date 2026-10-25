@@ -14,8 +14,11 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -29,6 +32,11 @@ import kotlinx.serialization.encodeToString
 
 internal data class FitnessConfirmation(val title: String, val message: String, val confirm: () -> Unit)
 
+private val FitnessRecordScopeSaver = Saver<FitnessRecordScope?, String>(
+    save = { scope -> scope?.let { FitnessJson.encodeToString(it) } },
+    restore = { FitnessJson.decodeFromString<FitnessRecordScope>(it) },
+)
+
 @Composable
 fun FitnessRoute(dependencies: FitnessFeatureDependencies, onExit: () -> Unit,
     vm: FitnessViewModel = viewModel(factory = FitnessViewModelFactory(dependencies))) {
@@ -41,13 +49,13 @@ fun FitnessRoute(dependencies: FitnessFeatureDependencies, onExit: () -> Unit,
     var category by rememberSaveable { mutableStateOf<String?>(null) }
     var libraryMode by rememberSaveable { mutableStateOf("category") }
     var query by rememberSaveable { mutableStateOf("") }
-    var mine by rememberSaveable { mutableStateOf(true) }
+    var mine by rememberSaveable { mutableStateOf(false) }
     var sourceFilter by rememberSaveable { mutableStateOf("all") }
     var includeSecondary by rememberSaveable { mutableStateOf(false) }
     var libraryLimit by rememberSaveable { mutableIntStateOf(20) }
     var pickerScope by rememberSaveable { mutableStateOf("part:Chest") }
     var pickerQuery by rememberSaveable { mutableStateOf("") }
-    var pickerMine by rememberSaveable { mutableStateOf(true) }
+    var pickerMine by rememberSaveable { mutableStateOf(false) }
     var pickerSource by rememberSaveable { mutableStateOf("all") }
     var pickerSelected by rememberSaveable { mutableStateOf(false) }
     var pickerLimit by rememberSaveable { mutableIntStateOf(20) }
@@ -65,7 +73,7 @@ fun FitnessRoute(dependencies: FitnessFeatureDependencies, onExit: () -> Unit,
     var copySource by remember { mutableStateOf<FitnessPlanDay?>(null) }
     var confirmation by remember { mutableStateOf<FitnessConfirmation?>(null) }
     var scopedTitle by rememberSaveable { mutableStateOf<String?>(null) }
-    var scopedScope by remember { mutableStateOf<FitnessRecordScope?>(null) }
+    var scopedScope by rememberSaveable(stateSaver = FitnessRecordScopeSaver) { mutableStateOf<FitnessRecordScope?>(null) }
     val snackbar = remember { SnackbarHostState() }
     val homeList = rememberLazyListState()
     val plansList = rememberLazyListState()
@@ -78,6 +86,7 @@ fun FitnessRoute(dependencies: FitnessFeatureDependencies, onExit: () -> Unit,
     val pickerList = rememberLazyListState()
     val sourceList = rememberLazyListState()
     val scope = rememberCoroutineScope()
+    val focusManager = LocalFocusManager.current
 
     fun listFor(destination: String) = when (destination) {
         "Plans" -> plansList; "PlanDetail" -> planDetailList; "Editor" -> editorList; "Detail", "SourceDetail" -> detailList
@@ -86,7 +95,7 @@ fun FitnessRoute(dependencies: FitnessFeatureDependencies, onExit: () -> Unit,
     val mainList = listFor(page)
 
     fun editor(request: FitnessEditorRequest) { vm.requestEditor(request) { page = "Editor"; scope.launch { editorList.scrollToItem(0) } } }
-    fun detail(id: String, origin: String = page) { detailOrigin = origin; detailId = id; page = "Detail"; scope.launch { detailList.scrollToItem(0) } }
+    fun detail(id: String, origin: String = page) { focusManager.clearFocus(); detailOrigin = origin; detailId = id; page = "Detail"; scope.launch { detailList.scrollToItem(0) } }
     fun openPlan(id: String, selectedDate: String, origin: String = page) {
         planId = id; date = selectedDate; planOrigin = origin; vm.selectDate(date, id); page = "PlanDetail"; scope.launch { planDetailList.scrollToItem(0) }
     }
@@ -110,7 +119,7 @@ fun FitnessRoute(dependencies: FitnessFeatureDependencies, onExit: () -> Unit,
             "LibraryList", "Search" -> page = "Library"
             "Picker" -> page = "Editor"
             "Editor" -> vm.leaveEditor { page = "Plans" }
-            "PlanDetail" -> page = planOrigin.takeIf { it in listOf("Today", "Stats", "Plans") } ?: "Plans"
+            "PlanDetail" -> page = planOrigin.takeIf { it in listOf("Today", "Stats", "Plans", "Library", "LibraryList", "Search", "Detail") } ?: "Plans"
             "Today" -> onExit()
             else -> root("Today")
         }
@@ -134,6 +143,9 @@ fun FitnessRoute(dependencies: FitnessFeatureDependencies, onExit: () -> Unit,
         if (vm.loaded && !vm.editorVisible && vm.draft != null && (page in listOf("Editor", "Picker") || page == "Detail" && detailOrigin in listOf("Editor", "Picker"))) vm.resumeEditor({})
     }
     LaunchedEffect(vm.loaded, page, libraryMode) { if (vm.loaded && page == "Search" && libraryMode == "recent") vm.loadRecent() }
+    LaunchedEffect(vm.loaded, scopedTitle, scopedScope) {
+        if (vm.loaded) vm.recordScope(if (scopedTitle != null) scopedScope else null)
+    }
     LaunchedEffect(vm.draft?.plan?.id, vm.draft?.step) { if (page == "Editor") editorList.scrollToItem(0) }
     BackHandler { back() }
 
@@ -146,10 +158,12 @@ fun FitnessRoute(dependencies: FitnessFeatureDependencies, onExit: () -> Unit,
     val selectedRoot = when (page) { "Editor", "Picker", "PlanDetail" -> "Plans"; "Detail" -> when (detailOrigin) { "Today" -> "Today"; "PlanDetail", "Picker", "Editor" -> "Plans"; "Stats" -> "Stats"; else -> "Library" }; "LibraryList", "Search" -> "Library"; else -> page }
     Scaffold(modifier = Modifier.fillMaxSize().safeDrawingPadding(), snackbarHost = { SnackbarHost(snackbar) },
         bottomBar = {
-            NavigationBar {
+            NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
                 listOf("Today" to ("今日" to Icons.Default.Home), "Plans" to ("计划" to Icons.Default.CalendarMonth),
                     "Library" to ("动作库" to Icons.Default.FitnessCenter), "Stats" to ("统计" to Icons.Default.BarChart)).forEach { (id, value) ->
                     NavigationBarItem(selected = selectedRoot == id, onClick = { if (!vm.busy) root(id) },
+                        colors = NavigationBarItemDefaults.colors(indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                            selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer, selectedTextColor = MaterialTheme.colorScheme.primary),
                         icon = { Icon(value.second, contentDescription = null) }, label = { Text(value.first) })
                 }
             }
@@ -170,7 +184,7 @@ fun FitnessRoute(dependencies: FitnessFeatureDependencies, onExit: () -> Unit,
                 } else if (!vm.loaded) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                 else {
                     val state = when (page) { "LibraryList", "Search" -> libraryList; "Picker" -> pickerList; "Sources" -> sourceList; else -> mainList }
-                    LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = state,
+                    LazyColumn(Modifier.weight(1f).fillMaxWidth().testTag("fitness-page"), state = state,
                         contentPadding = PaddingValues(top = 12.dp, bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                         if (page == "Today") fitnessToday(vm, date,
                             onDate = { date = it; vm.selectDate(it) }, onEditor = ::editor,
@@ -181,19 +195,18 @@ fun FitnessRoute(dependencies: FitnessFeatureDependencies, onExit: () -> Unit,
                         if (page == "Plans") fitnessPlans(vm, ::editor, onOpen = { id, day -> openPlan(id, day, "Plans") }, onConfirm = { confirmation = it }, onResume = { vm.resumeEditor({ page = "Editor" }) })
                         if (page == "PlanDetail") fitnessPlanDetail(vm, planId, date,
                             onDate = { date = it; vm.selectDate(it, planId) }, onEditor = ::editor,
-                            onFocus = { row, index -> vm.focus(row); scope.launch { mainList.animateScrollToItem(index) } },
                             onDetail = { detail(it, "PlanDetail") }, onBackfill = { batchRow = it }, onConfirm = { confirmation = it },
                             onCopy = { copySource = it }, onRecords = { vm.records(it.item.id) })
-                        if (page == "Library") fitnessLibrary(vm, onCategory = { key -> category = key; libraryMode = "category"; query = ""; mine = true; sourceFilter = "all"; includeSecondary = false; libraryLimit = 20; page = "LibraryList" },
-                            onSearch = { mode -> libraryMode = mode; category = null; query = ""; mine = mode == "all"; sourceFilter = "all"; libraryLimit = 20; page = "Search" }, onCustom = { custom() })
+                        if (page == "Library") fitnessLibrary(vm, onCategory = { key -> category = key; libraryMode = "category"; query = ""; mine = false; sourceFilter = "all"; includeSecondary = false; libraryLimit = 20; page = "LibraryList" },
+                            onSearch = { mode -> libraryMode = mode; category = null; query = ""; mine = false; sourceFilter = "all"; libraryLimit = 20; page = "Search" }, onCustom = { custom() })
                         if (page in listOf("LibraryList", "Search")) fitnessLibraryList(vm, category, libraryMode, query, mine, sourceFilter, includeSecondary, libraryLimit,
                             onQuery = { query = it; libraryLimit = 20; scope.launch { libraryList.scrollToItem(0) } },
                             onMine = { mine = it; libraryLimit = 20 }, onSource = { sourceFilter = it; libraryLimit = 20 },
                             onSecondary = { includeSecondary = it; libraryLimit = 20 }, onMore = { libraryLimit += 20 }, onDetail = { detail(it, page) },
-                            onClear = { query = ""; mine = true; sourceFilter = "all"; libraryLimit = 20 },
+                            onClear = { query = ""; mine = false; sourceFilter = "all"; includeSecondary = false; libraryLimit = 20 },
                             onGlobal = { category = null; libraryMode = "all"; mine = false; page = "Search" }, onCustom = { custom(scopeHint = category.orEmpty()) })
                         if (page == "Editor") fitnessEditor(vm,
-                            onPick = { pickerScope = it; pickerQuery = ""; pickerMine = true; pickerSource = "all"; pickerSelected = false; pickerLimit = 20; page = "Picker" },
+                            onPick = { pickerScope = it; pickerQuery = ""; pickerMine = false; pickerSource = "all"; pickerSelected = false; pickerLimit = 20; page = "Picker" },
                             onDetail = { detail(it, "Editor") }, onConfirm = { confirmation = it },
                             onLeave = { vm.leaveEditor { page = "Plans" } },
                             onDiscarded = { page = "Plans" },
@@ -202,7 +215,7 @@ fun FitnessRoute(dependencies: FitnessFeatureDependencies, onExit: () -> Unit,
                             onScope = { pickerScope = it; pickerQuery = ""; pickerLimit = 20 },
                             onQuery = { pickerQuery = it; pickerLimit = 20 }, onMine = { pickerMine = it; pickerLimit = 20 }, onSource = { pickerSource = it; pickerLimit = 20 },
                             onSelected = { pickerSelected = !pickerSelected }, onMore = { pickerLimit += 20 }, onDetail = { detail(it, "Picker") },
-                            onClear = { pickerQuery = ""; pickerMine = true; pickerSource = "all"; pickerLimit = 20 }, onCustom = { custom(add = true) }, onConfirm = { confirmation = it })
+                            onClear = { pickerQuery = ""; pickerMine = false; pickerSource = "all"; pickerSelected = false; pickerLimit = 20 }, onCustom = { custom(add = true) }, onConfirm = { confirmation = it })
                         if (page == "Detail") fitnessDetail(vm, detailId, onAdd = {
                             val exercise = vm.exercises.firstOrNull { it.id == detailId }
                             when (detailOrigin) {
@@ -225,7 +238,7 @@ fun FitnessRoute(dependencies: FitnessFeatureDependencies, onExit: () -> Unit,
                     if (page == "Picker") {
                         val count = vm.draft?.let { it.plan.day(it.selectedDate)?.activeItems?.size } ?: 0
                         Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text("已选$count个", Modifier.weight(1f), fontWeight = FontWeight.Bold)
+                            Text("已选${count}个", Modifier.weight(1f), fontWeight = FontWeight.Bold)
                             TextButton(onClick = { pickerSelected = !pickerSelected }) { Text(if (pickerSelected) "看候选" else "查看已选") }
                             Button(onClick = { page = "Editor" }) { Text("完成选择") }
                         }
@@ -250,7 +263,7 @@ fun FitnessRoute(dependencies: FitnessFeatureDependencies, onExit: () -> Unit,
         onActual = { actualJson = FitnessJson.encodeToString(it) }, onDay = ::recordDay, onDetail = { vm.closeItemRecords(); detail(it, page) }) }
     scopedTitle?.let { titleValue -> FitnessRecordDialog(vm, titleValue, vm.scopedRecords,
         onDismiss = { scopedTitle = null; scopedScope = null; vm.recordScope(null) }, onActual = { actualJson = FitnessJson.encodeToString(it) }, onDay = ::recordDay,
-        onDetail = { scopedTitle = null; vm.recordScope(null); detail(it, "Stats") },
+        onDetail = { scopedTitle = null; scopedScope = null; vm.recordScope(null); detail(it, page) },
         onMore = scopedScope?.takeIf { vm.scopedRecords.size >= it.limit && it.limit < 5000 }?.let { value -> { scopedScope = value.copy(limit = value.limit + 200); vm.recordScope(scopedScope) } }) }
     actualJson?.let { encoded -> val event = FitnessJson.decodeFromString<FitnessSetEvent>(encoded); FitnessActualDialog(vm, event) { actualJson = null } }
     if (customOpen) FitnessCustomDialog(vm, vm.exercises.firstOrNull { it.id == customId }, vm.catalog?.sourceRecords?.firstOrNull { it.id == customSourceId }, customAdd, customScope.ifBlank { if (customAdd) pickerScope else "" }) { customOpen = false }

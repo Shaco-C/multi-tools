@@ -81,14 +81,22 @@ internal fun LazyListScope.fitnessEditor(vm: FitnessViewModel, onPick: (String) 
         } }
         items(day.activeItems, key = { "edit-${it.id}" }) { row -> FitnessCard {
             val exercise = vm.exercises.firstOrNull { it.id == row.exercise.exerciseId }
-            if (exercise != null) FitnessExerciseRow(vm, exercise, { onDetail(exercise.id) }) else Text(row.exercise.name)
+            if (exercise != null) FitnessExerciseRow(vm, exercise.copy(unit = row.exercise.unit, side = row.exercise.side), { onDetail(exercise.id) }) else Text(row.exercise.name)
+            val measurementLocked = vm.editorHistory.any { it.itemId == row.id }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(Modifier.weight(1f)) { FitnessChoice("计量单位", row.exercise.unit.name, FitnessUnit.entries.map { it.name to it.label },
+                    { vm.updateMeasurement(row.id, FitnessUnit.valueOf(it), row.exercise.side) }, !vm.busy && !measurementLocked) }
+                Box(Modifier.weight(1f)) { FitnessChoice("计量口径", row.exercise.side.name, listOf("Total" to "合计", "Each" to "每侧分别"),
+                    { vm.updateMeasurement(row.id, row.exercise.unit, FitnessSide.valueOf(it)) }, !vm.busy && !measurementLocked) }
+            }
+            if (measurementLocked) Text("已有完成/撤销历史，计量口径已固定。", style = MaterialTheme.typography.labelSmall)
             val raw = draft.rawTargets[row.id] ?: FitnessTargetInput(row.targetSets?.toString().orEmpty(), row.targetValue?.toString().orEmpty())
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(raw.sets, { vm.updateTarget(row.id, sets = it) }, label = { Text(if (row.exercise.purpose == FitnessPurpose.Strength) "组数 1—99" else "段数 1—99") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, enabled = !vm.busy, modifier = Modifier.weight(1f))
                 OutlinedTextField(raw.value, { vm.updateTarget(row.id, value = it) }, label = { Text("${if (row.exercise.side == FitnessSide.Each) "每侧" else "每组/段"}${row.exercise.unit.label}") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, enabled = !vm.busy, modifier = Modifier.weight(1f))
             }
             val completed = vm.editorHistory.count { it.itemId == row.id && it.isValid() }
-            if (completed > 0) Text("已完成$completed组/段；新的目标不能少于已完成数。")
+            if (completed > 0) Text("已完成${completed}组/段；新的目标不能少于已完成数。")
             Row {
                 val index = day.items.indexOf(row)
                 TextButton(onClick = { vm.updateDay { current -> val values = current.items.toMutableList(); java.util.Collections.swap(values, index, index - 1); current.copy(items = values) } }, enabled = !vm.busy && index > 0) { Text("上移") }
@@ -102,6 +110,7 @@ internal fun LazyListScope.fitnessEditor(vm: FitnessViewModel, onPick: (String) 
         item("editor-review") { FitnessCard {
             Text(plan.name, style = MaterialTheme.typography.titleLarge)
             Text("${plan.start} 至 ${plan.end}\n${plan.days.count { it.activeItems.isNotEmpty() }}个训练日 · ${plan.days.sumOf { it.activeItems.size }}个动作安排")
+            Text("${plan.days.count { it.kind == FitnessDayKind.Rest }}个休息日 · ${plan.days.count { it.kind == FitnessDayKind.Unplanned && it.date >= plan.start && it.date <= plan.end }}个未安排日 · ${issues.mapNotNull { it.date }.distinct().size}个待补日")
             if (issues.isEmpty()) FitnessHint("检查完成。保存后即可从今日页面逐组记录。")
             issues.forEach { issue -> TextButton(onClick = {
                 vm.updateDraft { it.copy(selectedDate = issue.date ?: it.selectedDate, step = if (issue.field in listOf("name", "range")) 0 else if (issue.field == "part") 1 else 2) }

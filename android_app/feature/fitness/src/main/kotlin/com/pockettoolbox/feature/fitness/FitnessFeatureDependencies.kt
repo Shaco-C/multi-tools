@@ -6,7 +6,7 @@ import java.io.File
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-class FitnessFeatureDependencies private constructor(
+class FitnessFeatureDependencies internal constructor(
     val repository: RoomFitnessRepository,
     val catalog: FitnessCatalog,
     val media: FitnessMediaStore,
@@ -26,7 +26,7 @@ class FitnessFeatureDependencies private constructor(
     }
 
     companion object {
-        val isEnabled: Boolean get() = BuildConfig.DEBUG || BuildConfig.FITNESS_RELEASE_CONTENT
+        val isEnabled: Boolean get() = BuildConfig.DEBUG || BuildConfig.FITNESS_RELEASE_ENABLED
         fun create(context: Context): FitnessFeatureDependencies {
             val app = context.applicationContext
             val repository = RoomFitnessRepository(FitnessDatabase.open(app))

@@ -160,8 +160,8 @@ data class FitnessData(
 data class FitnessSnapshot(val data: FitnessData = FitnessData(), val events: List<FitnessSetEvent> = emptyList())
 
 data class FitnessPlanIssue(val message: String, val date: String? = null, val itemId: String? = null, val field: String = "")
-data class FitnessFilter(val start: String, val end: String, val planId: String? = null, val purpose: FitnessPurpose? = null)
-data class FitnessRecordScope(val filter: FitnessFilter, val exerciseId: String? = null, val part: FitnessPart? = null,
+@Serializable data class FitnessFilter(val start: String, val end: String, val planId: String? = null, val purpose: FitnessPurpose? = null)
+@Serializable data class FitnessRecordScope(val filter: FitnessFilter, val exerciseId: String? = null, val part: FitnessPart? = null,
     val unit: FitnessUnit? = null, val side: FitnessSide? = null, val limit: Int = 200)
 data class FitnessStreak(val days: Int, val anchor: String?)
 data class FitnessScheduledItem(val plan: FitnessPlan, val day: FitnessPlanDay, val item: FitnessPlanItem, val completed: Int)

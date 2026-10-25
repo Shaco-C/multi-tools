@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -37,6 +38,7 @@ internal val FitnessEquipmentLabels = linkedMapOf(
     "anchorLow" to "低位固定点", "wall" to "稳定墙面", "step" to "固定踏步台", "pullupBar" to "单杠",
     "barbell" to "杠铃及保护装置", "cable" to "绳索训练机", "machine" to "对应专用训练机", "kettlebell" to "壶铃",
     "ball" to "健身球", "medicineBall" to "药球", "foamRoll" to "泡沫轴", "stretchStrap" to "无弹性拉伸带",
+    "ezBar" to "曲杆及配套装置", "sourceEquipmentUnknown" to "器械待确认（见原图）",
 )
 
 @Composable
@@ -51,9 +53,9 @@ internal fun FitnessCard(modifier: Modifier = Modifier, content: @Composable Col
 @Composable
 internal fun FitnessHint(text: String, warning: Boolean = false) {
     Text(text, modifier = Modifier.fillMaxWidth().background(
-        if (warning) MaterialTheme.colorScheme.errorContainer.copy(alpha = .5f) else MaterialTheme.colorScheme.secondaryContainer.copy(alpha = .5f),
+        if (warning) MaterialTheme.colorScheme.errorContainer.copy(alpha = .5f) else MaterialTheme.colorScheme.primaryContainer.copy(alpha = .5f),
         RoundedCornerShape(12.dp)).padding(13.dp), style = MaterialTheme.typography.bodySmall,
-        color = if (warning) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSecondaryContainer)
+        color = if (warning) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer)
 }
 
 @Composable
@@ -79,13 +81,14 @@ internal fun FitnessChoice(label: String, value: String, choices: List<Pair<Stri
 
 @Composable
 internal fun FitnessExerciseRow(vm: FitnessViewModel, exercise: FitnessExercise, onClick: () -> Unit, selected: Boolean? = null, onToggle: (() -> Unit)? = null) {
-    Card(onClick = onClick, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(17.dp),
-        colors = CardDefaults.cardColors(containerColor = if (selected == true) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface)) {
+    Card(onClick = onClick, modifier = Modifier.fillMaxWidth().testTag("fitness-exercise-${exercise.id}"), shape = RoundedCornerShape(17.dp),
+        colors = CardDefaults.cardColors(containerColor = if (selected == true) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface)) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             FitnessMuscle(vm.dependencies, exercise.primaryPart, exercise.id, Modifier.size(43.dp, 66.dp))
             FitnessMedia(vm.dependencies, exercise.images.lastOrNull(), vm.data.mediaGeneration, "${exercise.name}姿势图", Modifier.size(64.dp), width = 64.dp, height = 64.dp)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 Text(exercise.name, fontWeight = FontWeight.Bold)
+                if (exercise.id.startsWith("SRC-")) Text("来源动作 · 原图/原文", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("${exercise.purpose.label} · ${if (exercise.side == FitnessSide.Each) "每侧" else ""}${exercise.unit.label}", style = MaterialTheme.typography.labelSmall)
                 Text(exercise.equipment.firstOrNull().orEmpty().joinToString("＋") { FitnessEquipmentLabels[it] ?: it }, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }

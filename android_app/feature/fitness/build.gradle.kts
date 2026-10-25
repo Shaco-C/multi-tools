@@ -21,7 +21,21 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     buildFeatures { compose = true; buildConfig = true }
-    testOptions.unitTests.isIncludeAndroidResources = true
+    testOptions.unitTests {
+        isIncludeAndroidResources = true
+        all {
+            it.systemProperty("user.home", gradle.gradleUserHomeDir.absolutePath)
+            it.systemProperty("java.io.tmpdir", gradle.gradleUserHomeDir.resolve("robolectric/tmp").apply { mkdirs() }.absolutePath)
+            it.systemProperty("maven.repo.local", gradle.gradleUserHomeDir.resolve("robolectric/repository").absolutePath)
+            it.systemProperty("robolectric.dependency.repo.url", "https://repo.maven.apache.org/maven2")
+            it.systemProperty("fitness.screenshot.dir", layout.buildDirectory.dir("reports/fitness-ui").get().asFile.absolutePath)
+        }
+    }
+}
+
+// Exercise the same storage contracts on the host and on Android devices.
+extensions.configure<com.android.build.api.dsl.LibraryExtension> {
+    sourceSets.getByName("test").kotlin.srcDir("src/androidTest/kotlin/com/pockettoolbox/feature/fitness/data")
 }
 
 room { schemaDirectory("$projectDir/schemas") }
@@ -45,6 +59,12 @@ dependencies {
     ksp(libs.androidx.room.compiler)
     testImplementation(libs.junit4)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.androidx.test.core)
+    testImplementation(libs.androidx.test.ext.junit)
+    testImplementation("org.robolectric:robolectric:4.17")
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    testImplementation("androidx.test.espresso:espresso-core:3.7.0")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
     androidTestImplementation(libs.androidx.room.testing)
     androidTestImplementation(libs.androidx.test.core)
     androidTestImplementation(libs.androidx.test.ext.junit)
@@ -55,8 +75,11 @@ val fitnessContentDirectory = rootProject.file("../content/fitness/android")
 val fitnessContentProperties = Properties().apply {
     fitnessContentDirectory.resolve("content.properties").inputStream().use(::load)
 }
+val fitnessReleaseProperties = Properties().apply {
+    fitnessContentDirectory.resolve("release.properties").takeIf { it.isFile }?.inputStream()?.use(::load)
+}
 val fitnessArchive = rootProject.file("../" + fitnessContentProperties.getProperty("sourceArchive"))
-val verifyFitnessSourceArchive by tasks.registering {
+val verifyFitnessSourceArchive = tasks.register("verifyFitnessSourceArchive") {
     inputs.file(fitnessArchive)
     inputs.file(fitnessContentDirectory.resolve("content.properties"))
     val stamp = layout.buildDirectory.file("fitness/source-archive.ok")
@@ -70,10 +93,14 @@ val verifyFitnessSourceArchive by tasks.registering {
         stamp.get().asFile.apply { parentFile.mkdirs(); writeText(actual) }
     }
 }
-val generatedFitnessAssets = layout.buildDirectory.dir("generated/fitnessAssets")
-val prepareFitnessAssets by tasks.registering(Sync::class) {
+abstract class FitnessAssetsTask : Sync() {
+    @get:OutputDirectory
+    abstract val assetsDirectory: DirectoryProperty
+    init { into(assetsDirectory) }
+}
+val prepareFitnessAssets = tasks.register<FitnessAssetsTask>("prepareFitnessAssets") {
     dependsOn(verifyFitnessSourceArchive)
-    into(generatedFitnessAssets)
+    assetsDirectory.set(layout.buildDirectory.dir("generated/fitnessAssets"))
     from(fitnessContentDirectory) { include("catalog.json", "content.properties"); into("fitness") }
     from(rootProject.file("../content/fitness/pilot/media")) { into("fitness/media") }
     from(rootProject.file("../content/fitness/pilot/muscles")) { into("fitness/muscles") }
@@ -82,29 +109,53 @@ val prepareFitnessAssets by tasks.registering(Sync::class) {
     from({ zipTree(fitnessArchive) }) {
         val prefix = "free-exercise-db-${fitnessContentProperties.getProperty("sourceRevision")}/exercises/"
         include("$prefix**/*.jpg", "$prefix**/*.jpeg", "$prefix**/*.png", "$prefix**/*.webp")
-        eachFile { path = path.removePrefix(prefix) }
+        // Copy details already include the destination prefix at this point.
+        eachFile {
+            require(path.contains(prefix)) { "Unexpected source image path: $path" }
+            path = "fitness/source-media/" + path.substringAfter(prefix)
+        }
         includeEmptyDirs = false
         into("fitness/source-media")
     }
 }
 val fitnessReleaseContentApproved = fitnessContentProperties.getProperty("releaseApproved") == "true"
-android.defaultConfig.buildConfigField("boolean", "FITNESS_RELEASE_CONTENT", fitnessReleaseContentApproved.toString())
-android.sourceSets.getByName("debug").assets.srcDir(generatedFitnessAssets)
-tasks.matching { it.name == "preDebugBuild" }.configureEach { dependsOn(prepareFitnessAssets) }
-if (fitnessReleaseContentApproved) {
-    android.sourceSets.getByName("release").assets.srcDir(generatedFitnessAssets)
-    tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(prepareFitnessAssets) }
+val fitnessReleaseEnabled = fitnessReleaseProperties.getProperty("enabled") == "true"
+android.defaultConfig.buildConfigField("boolean", "FITNESS_RELEASE_ENABLED", fitnessReleaseEnabled.toString())
+android.defaultConfig.buildConfigField("boolean", "FITNESS_CONTENT_REVIEWED", fitnessReleaseContentApproved.toString())
+androidComponents.beforeVariants(androidComponents.selector().withBuildType("release")) {
+    (it as com.android.build.api.variant.HasHostTestsBuilder).hostTests
+        .getValue(com.android.build.api.variant.HostTestBuilder.UNIT_TEST_TYPE).enable = true
+}
+androidComponents.onVariants { variant ->
+    if (variant.buildType == "debug" || fitnessReleaseEnabled) {
+        variant.sources.assets?.addGeneratedSourceDirectory(prepareFitnessAssets, FitnessAssetsTask::assetsDirectory)
+    }
 }
 
-val verifyFitnessReleaseContent by tasks.registering {
+// AGP 9.4's local-test resource APK can stay up-to-date after generated asset
+// paths change. Track these inputs explicitly and wait for their merged output.
+tasks.matching { it.name in listOf("packageDebugUnitTestForUnitTest", "packageReleaseUnitTestForUnitTest") }.configureEach {
+    dependsOn(if (name.contains("Release")) "mergeReleaseUnitTestAssets" else "mergeDebugUnitTestAssets")
+    inputs.dir(prepareFitnessAssets.flatMap { it.assetsDirectory })
+        .withPropertyName("fitnessGeneratedAssets").withPathSensitivity(PathSensitivity.RELATIVE)
+}
+
+val verifyFitnessReleaseContent = tasks.register("verifyFitnessReleaseContent") {
     inputs.file(fitnessContentDirectory.resolve("content.properties"))
-    onlyIf { fitnessReleaseContentApproved }
+    inputs.file(fitnessContentDirectory.resolve("release.properties"))
+    onlyIf { fitnessReleaseEnabled }
     doLast {
-        require(fitnessContentProperties.getProperty("releaseApproved") == "true" &&
-            fitnessContentProperties.getProperty("reviewedCount").toInt() == fitnessContentProperties.getProperty("exerciseCount").toInt() &&
+        require(fitnessReleaseProperties.getProperty("contentVersion") == fitnessContentProperties.getProperty("version") &&
+            fitnessReleaseProperties.getProperty("sourceRevision") == fitnessContentProperties.getProperty("sourceRevision") &&
+            fitnessReleaseProperties.getProperty("sourceArchiveSha256") == fitnessContentProperties.getProperty("sourceArchiveSha256") &&
             fitnessContentProperties.getProperty("exerciseCount").toInt() > 0 &&
+            fitnessContentProperties.getProperty("sourceCount").toInt() > 0) {
+            "正式发布的健身内容与锁定版本不一致，请核对release.properties及来源包。"
+        }
+        if (fitnessReleaseContentApproved) require(
+            fitnessContentProperties.getProperty("reviewedCount").toInt() == fitnessContentProperties.getProperty("exerciseCount").toInt() &&
             fitnessContentProperties.getProperty("sourceProcessedCount").toInt() == fitnessContentProperties.getProperty("sourceCount").toInt()) {
-            "健身内容仍为开发/待审状态，不能打入正式release；请完成全量映射、中文和逐项审核。debug可用于内部验证。"
+            "教学审校数量不完整，不能标记为已专业审校。"
         }
     }
 }

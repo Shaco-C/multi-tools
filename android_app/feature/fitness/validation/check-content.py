@@ -13,6 +13,11 @@ assert len(catalog['sourceRecords']) == len(sources) == int(properties['sourceCo
 assert len(catalog['exercises']) == int(properties['exerciseCount']) == 16
 assert catalog['reviewedCount'] == int(properties['reviewedCount']) == 0
 assert properties['releaseApproved'] == 'false'
+release = dict(line.split('=', 1) for line in (content / 'android/release.properties').read_text().splitlines() if line and not line.startswith('#'))
+assert release['enabled'] == 'true'
+assert release['contentVersion'] == properties['version']
+assert release['sourceRevision'] == properties['sourceRevision']
+assert release['sourceArchiveSha256'] == properties['sourceArchiveSha256']
 assert catalog['sourceRevision'] == properties['sourceRevision']
 source_by_id = {row['id']: row for row in sources}
 assert len(source_by_id) == len(sources)

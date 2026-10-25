@@ -29,15 +29,16 @@ internal fun LazyListScope.fitnessLibrary(vm: FitnessViewModel, onCategory: (Str
     item {
         FitnessCard {
             Text("先认识练哪里，再了解怎么做。", style = MaterialTheme.typography.titleMedium)
-            Text("中文样稿${vm.catalog?.exercises?.size ?: 0}项 · 全量来源${vm.catalog?.sourceCount ?: 0}条", style = MaterialTheme.typography.bodySmall)
+            Text("${vm.catalog?.selectableExercises?.size ?: 0}个内置可选动作 · 中文样稿${vm.catalog?.exercises?.size ?: 0}项＋来源动作${vm.catalog?.sourceCount ?: 0}项", style = MaterialTheme.typography.bodySmall)
             Row { Button(onClick = { onSearch("all") }) { Text("全库搜索") }; TextButton(onClick = onCustom) { Text("新建我的动作") } }
-            Text("当前内容为开发/待审状态，来源与生产进度可在管理中查看。", style = MaterialTheme.typography.labelSmall)
+            Text("所有来源动作均可搜索、收藏并加入计划。默认查看全部器械，也可切换为只看我的器械。", style = MaterialTheme.typography.labelSmall)
         }
     }
     val groups = FitnessPart.entries.chunked(3)
     items(groups) { group -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         group.forEach { part ->
-            Card(onClick = { onCategory("part:${part.name}") }, modifier = Modifier.weight(1f)) {
+            Card(onClick = { onCategory("part:${part.name}") }, modifier = Modifier.weight(1f),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(Modifier.fillMaxWidth().padding(10.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     FitnessMuscle(vm.dependencies, part, modifier = Modifier.size(50.dp, 76.dp))
                     Text(part.label, style = MaterialTheme.typography.labelLarge)
@@ -70,11 +71,11 @@ internal fun LazyListScope.fitnessLibraryList(vm: FitnessViewModel, category: St
     }.let { rows -> if (mode == "recent") rows.sortedBy { vm.recentExerciseIds.indexOf(it.id) } else rows }
     item {
         FitnessCard {
-            Text(category?.let(::fitnessScopeLabel) ?: when (mode) { "favorites" -> "我的收藏"; "recent" -> "最近练过"; else -> "搜索全部已整理动作" }, fontWeight = FontWeight.Bold)
+            Text(category?.let(::fitnessScopeLabel) ?: when (mode) { "favorites" -> "我的收藏"; "recent" -> "最近练过"; else -> "搜索全部动作" }, fontWeight = FontWeight.Bold)
             OutlinedTextField(query, onQuery, label = { Text("搜索名称、别名或英文名") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
             if (category?.startsWith("part:") == true) Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(secondary, onSecondary); Text("也看辅助参与") }
             FitnessChoice("器械匹配", if (mine) "mine" else "all", listOf("mine" to "只看我的器械", "all" to "查看全部器械"), { onMine(it == "mine") })
-            FitnessChoice("动作来源", source, listOf("all" to "内置＋自建", "builtin" to "内置样稿", "personal" to "我的动作"), onSource)
+            FitnessChoice("动作来源", source, listOf("all" to "内置＋自建", "builtin" to "全部内置动作", "personal" to "我的动作"), onSource)
             Row { Text("${matches.size}个匹配，已显示${minOf(limit, matches.size)}", Modifier.weight(1f)); TextButton(onClick = onClear) { Text("重置筛选") } }
         }
     }
@@ -105,12 +106,12 @@ internal fun FitnessGallery(vm: FitnessViewModel, images: List<FitnessImage>, na
 
 @Composable
 private fun FitnessPager(vm: FitnessViewModel, images: List<FitnessImage>, name: String, frame: Int, onFrame: (Int) -> Unit, height: Int) {
-    if (images.isEmpty()) { FitnessMedia(vm.dependencies, null, vm.data.mediaGeneration, "$name暂无图片", Modifier.fillMaxWidth().height(200.dp)); return }
+    if (images.isEmpty()) { FitnessMedia(vm.dependencies, null, vm.data.mediaGeneration, "${name}暂无图片", Modifier.fillMaxWidth().height(200.dp)); return }
     val pager = rememberPagerState(initialPage = frame.coerceIn(0, images.lastIndex), pageCount = { images.size })
     LaunchedEffect(frame, images.size) { if (pager.currentPage != frame.coerceIn(0, images.lastIndex)) pager.scrollToPage(frame.coerceIn(0, images.lastIndex)) }
     LaunchedEffect(pager.currentPage) { onFrame(pager.currentPage) }
     HorizontalPager(state = pager, modifier = Modifier.fillMaxWidth().height(height.dp)) { index ->
-        FitnessMedia(vm.dependencies, images[index], vm.data.mediaGeneration, "$name步骤图${index + 1}/${images.size}", Modifier.fillMaxSize(), width = 360.dp, height = height.dp, retryEnabled = true)
+        FitnessMedia(vm.dependencies, images[index], vm.data.mediaGeneration, "${name}步骤图${index + 1}/${images.size}", Modifier.fillMaxSize(), width = 360.dp, height = height.dp, retryEnabled = true)
     }
 }
 
@@ -123,7 +124,7 @@ internal fun LazyListScope.fitnessDetail(vm: FitnessViewModel, id: String?, onAd
             TextButton(onClick = { vm.favorite(exercise.id) }, enabled = !vm.busy) { Text(if (exercise.id in vm.data.favorites) "已收藏" else "收藏") }
         }
     }
-    item { FitnessHint(if (exercise.reviewed) "内容版本：${exercise.contentRevision}" else "内容样稿 · 待专业教学/解剖审校。") }
+    item { FitnessHint(if (exercise.id.startsWith("SRC-")) "来源动作 · 原始名称、步骤和图片。加入计划后可调整计量，中文教学仍待校订。" else if (exercise.reviewed) "内容版本：${exercise.contentRevision}" else "内容样稿 · 待专业教学/解剖审校。") }
     item { FitnessGallery(vm, exercise.images, exercise.name) }
     item { FitnessCard {
         Text("这个动作是什么", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -201,6 +202,7 @@ internal fun LazyListScope.fitnessSourceDetail(vm: FitnessViewModel, id: String?
     item {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             source.linkedExerciseId?.let { linked -> OutlinedButton(onClick = { onLinked(linked) }) { Text("查看关联中文样稿（对应关系待审）") } }
+            Button(onClick = { onLinked("SRC-${source.id}") }, enabled = !vm.busy) { Text("查看动作并加入计划") }
             Button(onClick = { onCustom(source.id) }, enabled = !vm.busy) { Text("复制为我的动作并填写计量") }
             Text("来源：free-exercise-db\nID：${source.id}\n版本：${vm.catalog?.sourceRevision}", style = MaterialTheme.typography.labelSmall)
         }

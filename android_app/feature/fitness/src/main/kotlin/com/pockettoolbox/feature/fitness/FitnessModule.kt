@@ -12,7 +12,7 @@ import com.pockettoolbox.feature.fitness.presentation.FitnessRoute
 
 class FitnessModule(private val dependencies: FitnessFeatureDependencies) : ToolModule {
     override val entry = ToolEntry("fitness", "居家健身", "安排训练，做完一组记一下。", "tools/fitness",
-        statusLabel = if (BuildConfig.FITNESS_RELEASE_CONTENT) null else "开发验证 · 内容待审",
+        statusLabel = if (BuildConfig.FITNESS_CONTENT_REVIEWED) null else "含英文来源动作",
         icon = { Icon(Icons.Default.FitnessCenter, contentDescription = null) })
 
     override fun registerRoutes(navGraphBuilder: NavGraphBuilder, navController: NavHostController, onExitTool: () -> Unit) {

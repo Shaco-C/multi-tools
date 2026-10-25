@@ -68,11 +68,12 @@ object FitnessArchive {
                 require(path.substringAfter('/').substringBefore('.') == hash) { "个人图片内容已损坏：$path" }
                 FitnessArchiveMedia(path, file.length(), hash)
             }
-            require(media.size + 2 <= MAX_ENTRIES && metadata.length() + media.sumOf { it.bytes } <= MAX_ARCHIVE_BYTES) { "备份超出当前容量范围" }
+            require(media.size + 2 <= MAX_ENTRIES) { "备份条目超出当前容量范围" }
             val manifest = FitnessArchiveManifest(exportedAt = at, contentVersion = contentVersion, plans = snapshot.data.plans.size,
                 events = snapshot.events.size, metadataSha256 = sha256(metadata), media = media)
             val manifestBytes = FitnessJson.encodeToString(manifest).toByteArray(Charsets.UTF_8)
             require(manifestBytes.size <= MAX_MANIFEST_BYTES) { "备份媒体清单超过支持容量" }
+            validateExpandedSize(metadata.length(), media.sumOf { it.bytes }, manifestBytes.size.toLong())
             ZipOutputStream(FitnessLimitedOutput(output, MAX_ARCHIVE_BYTES)).use { zip ->
                 fun entry(name: String, writer: (OutputStream) -> Unit) { zip.putNextEntry(ZipEntry(name)); writer(zip); zip.closeEntry() }
                 entry("manifest.json") { it.write(manifestBytes) }
@@ -80,6 +81,11 @@ object FitnessArchive {
                 for ((path, file) in images) entry("media/" + path.substringAfter('/')) { target -> file.inputStream().use { it.copyTo(target) } }
             }
         } finally { metadata.delete() }
+    }
+
+    internal fun validateExpandedSize(metadataBytes: Long, mediaBytes: Long, manifestBytes: Long) {
+        require(listOf(metadataBytes, mediaBytes, manifestBytes).all { it in 0..MAX_ARCHIVE_BYTES } &&
+            metadataBytes + mediaBytes + manifestBytes <= MAX_ARCHIVE_BYTES) { "备份展开后超过支持容量" }
     }
 
     fun inspect(input: InputStream, work: File, validateImage: (File) -> Unit): InspectedFitnessArchive {
@@ -96,7 +102,8 @@ object FitnessArchive {
                     val limit = when (entry.name) { "manifest.json" -> MAX_MANIFEST_BYTES; "snapshot.json" -> FitnessBackupCodec.MAX_METADATA_BYTES; else -> MAX_IMAGE_BYTES }
                     val file = File(directory, entry.name)
                     require(file.canonicalPath.startsWith(directory.canonicalPath + File.separator)) { "备份路径越界" }
-                    require(file.parentFile.isDirectory || file.parentFile.mkdirs()) { "暂存目录不可写" }
+                    val parent = requireNotNull(file.parentFile)
+                    require(parent.isDirectory || parent.mkdirs()) { "暂存目录不可写" }
                     var size = 0L
                     file.outputStream().use { target ->
                         val buffer = ByteArray(8192)

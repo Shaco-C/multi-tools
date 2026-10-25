@@ -33,10 +33,14 @@ internal fun FitnessDateField(label: String, date: String, enabled: Boolean = tr
     }, enabled = enabled, modifier = Modifier.fillMaxWidth()) { Text("$label · $date") }
 }
 
-internal fun fitnessEventTime(event: FitnessSetEvent): String = when (event.timeSource) {
-    FitnessTimeSource.DateOnly -> "${event.trainingDate} · 仅日期补记"
-    FitnessTimeSource.User -> "${event.trainingDate} ${Instant.ofEpochMilli(requireNotNull(event.actualAt)).atZone(ZoneId.of(event.zoneId)).format(DateTimeFormatter.ofPattern("HH:mm"))} · 手填时刻"
-    FitnessTimeSource.Realtime -> "${event.trainingDate} · 记录于${Instant.ofEpochMilli(event.recordedAt).atZone(ZoneId.of(event.zoneId)).format(DateTimeFormatter.ofPattern("MM-dd HH:mm"))}"
+internal fun fitnessEventTime(event: FitnessSetEvent): String {
+    val zone = ZoneId.of(event.zoneId)
+    val recorded = Instant.ofEpochMilli(event.recordedAt).atZone(zone).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
+    return when (event.timeSource) {
+        FitnessTimeSource.DateOnly -> "${event.trainingDate} · 仅日期补记\n补记操作于$recorded"
+        FitnessTimeSource.User -> "${event.trainingDate} ${Instant.ofEpochMilli(requireNotNull(event.actualAt)).atZone(zone).format(DateTimeFormatter.ofPattern("HH:mm"))} · 手填训练时刻\n补记操作于$recorded"
+        FitnessTimeSource.Realtime -> "${event.trainingDate} · 记录于$recorded"
+    }
 }
 
 @Composable
@@ -55,7 +59,7 @@ internal fun FitnessBackfillDialog(vm: FitnessViewModel, row: FitnessScheduledIt
             val parsed = FitnessRules.positive(count, remaining, "补记数")
             val at = time.trim().takeIf { it.isNotEmpty() }?.let { text ->
                 require(Regex("([01][0-9]|2[0-3]):[0-5][0-9]").matches(text)) { "时刻格式须为HH:mm" }
-                FitnessRules.date(row.day.date).atTime(LocalTime.parse(text)).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                FitnessRules.date(row.day.date).atTime(LocalTime.parse(text)).atZone(vm.zoneId).toInstant().toEpochMilli()
             }
             vm.complete(row, parsed, backfill = true, actualAt = at, after = onDismiss)
         } catch (failure: IllegalArgumentException) { error = failure.message }
@@ -100,7 +104,9 @@ internal fun FitnessActualDialog(vm: FitnessViewModel, event: FitnessSetEvent, o
         if (event.exercise.side == FitnessSide.Each) {
             OutlinedTextField(left, { left = it.take(5) }, label = { Text("左侧") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), enabled = !vm.busy)
             OutlinedTextField(right, { right = it.take(5) }, label = { Text("右侧") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), enabled = !vm.busy)
+            TextButton(onClick = { right = left }, enabled = !vm.busy && left.isNotBlank()) { Text("同值填两侧（使用左侧值）") }
         } else OutlinedTextField(total, { total = it.take(5) }, label = { Text("实际值") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), enabled = !vm.busy)
+        TextButton(onClick = { if (event.exercise.side == FitnessSide.Each) { left = event.targetValue.toString(); right = left } else total = event.targetValue.toString() }, enabled = !vm.busy) { Text("按当时目标填写（确认实际达到后使用）") }
         error?.let { FitnessHint(it, true) }
     } }, confirmButton = { TextButton(onClick = {
         try {
@@ -146,7 +152,7 @@ internal fun FitnessCustomDialog(vm: FitnessViewModel, original: FitnessExercise
             Row { Checkbox(each, { each = it; dirty = true }, enabled = !vm.busy); Text("每侧分别计量", Modifier.padding(top = 12.dp)) }
             Text("所需器械 *（本组全部具备才匹配；徒手勾选地面空间）")
             if (keepAlternatives) { Text("保留原动作的多组替代器械条件"); TextButton(onClick = { keepAlternatives = false; dirty = true }) { Text("改为单组条件") } }
-            else FitnessEquipmentLabels.forEach { (key, label) -> Row { Checkbox(key in equipment, { checked -> equipment = if (checked) equipment + key else equipment - key; dirty = true }, enabled = !vm.busy); Text(label, Modifier.padding(top = 12.dp)) } }
+            else FitnessEquipmentLabels.filterKeys { it != "sourceEquipmentUnknown" }.forEach { (key, label) -> Row { Checkbox(key in equipment, { checked -> equipment = if (checked) equipment + key else equipment - key; dirty = true }, enabled = !vm.busy); Text(label, Modifier.padding(top = 12.dp)) } }
             OutlinedTextField(introduction, { introduction = it.take(6000); dirty = true }, label = { Text("动作介绍（选填）") }, minLines = 2, enabled = !vm.busy)
             OutlinedTextField(steps, { steps = it.take(12000); dirty = true }, label = { Text("动作步骤，一行一步（选填）") }, minLines = 3, enabled = !vm.busy)
             OutlinedTextField(aliases, { aliases = it.take(600); dirty = true }, label = { Text("别名，用顿号分隔（选填）") }, enabled = !vm.busy)
@@ -183,7 +189,7 @@ internal fun FitnessAddDialog(vm: FitnessViewModel, exercise: FitnessExercise, o
     var error by rememberSaveable { mutableStateOf<String?>(null) }
     val plan = plans.firstOrNull { it.id == target }
     val existing = plan?.day(date)?.items?.firstOrNull { it.exercise.exerciseId == exercise.id }
-    AlertDialog(onDismissRequest = onDismiss, title = { Text("添加${exercise.name}") }, text = { Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    AlertDialog(onDismissRequest = onDismiss, title = { Text("添加${exercise.name}") }, text = { Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         FitnessChoice("目标计划", target, listOf("" to "新建单日计划") + plans.map { it.id to it.name }, { target = it; plans.firstOrNull { p -> p.id == it }?.let { p -> date = vm.today.takeIf { today -> today >= p.start && today <= p.end } ?: p.start } })
         FitnessDateField("训练日期", date, onDate = { date = it })
         if (existing == null) {

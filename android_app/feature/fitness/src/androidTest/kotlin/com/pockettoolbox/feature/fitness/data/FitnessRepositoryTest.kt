@@ -19,7 +19,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** 需在另一台电脑通过connectedDebugAndroidTest执行；本机未冒充运行Room/KSP。 */
+/** Shared Room contracts: host Robolectric with native SQLite, or connectedDebugAndroidTest. */
 @RunWith(AndroidJUnit4::class)
 class FitnessRepositoryTest {
     private lateinit var database: FitnessDatabase
@@ -97,6 +97,81 @@ class FitnessRepositoryTest {
         repository.saveDraft(FitnessDraft(old, false, old.start, savedAt = clock.millis()))
         val replacement = plan()
         repository.savePlan(replacement, clearDraft = true)
+        assertNull(repository.currentData().draft)
+    }
+
+    @Test fun dailyCountsIncludeArchivedHistoryAndExcludeRevokedRecords() = runBlocking {
+        val first = plan(); val second = plan(); val yesterday = plan("2026-10-23")
+        listOf(first, second, yesterday).forEach { repository.savePlan(it) }
+        val revoked = repository.complete(command(first), clock).single()
+        repository.complete(command(second), clock); repository.complete(command(yesterday), clock)
+        repository.archive(second.id, true)
+        val filter = FitnessFilter("2026-10-23", "2026-10-24")
+        assertEquals(mapOf("2026-10-23" to 1, "2026-10-24" to 2), repository.observeDailyCounts(filter).first())
+        repository.revoke(revoked.id, clock.millis())
+        assertEquals(1, repository.observeDailyCounts(filter).first()["2026-10-24"])
+        assertEquals(mapOf("2026-10-24" to 1), repository.observeDailyCounts(filter.copy(planId = second.id)).first())
+        assertTrue(repository.observeDailyCounts(filter.copy(purpose = FitnessPurpose.Cardio)).first().isEmpty())
+    }
+
+    @Test fun reusedRequestWithAnotherPlanIsRejectedWithoutChangingEitherPlan() = runBlocking {
+        val first = plan(); val second = plan(); repository.savePlan(first); repository.savePlan(second)
+        repository.complete(command(first, "request"), clock)
+        assertTrue(runCatching { repository.complete(command(second, "request"), clock) }.isFailure)
+        assertEquals(1, repository.planEvents(first.id).size); assertTrue(repository.planEvents(second.id).isEmpty())
+    }
+
+    @Test fun stoppedAndRevokedItemCanBeResumedWithoutChangingItsIdentity() = runBlocking {
+        val plan = plan(); repository.savePlan(plan)
+        val event = repository.complete(command(plan), clock).single()
+        repository.revoke(event.id, clock.millis())
+        repository.stopItem(plan.id, plan.start, event.itemId)
+        val stopped = repository.currentData().plans.single()
+        val resumed = stopped.copy(days = listOf(FitnessRules.addExercise(stopped.days.single(), exercise)))
+        repository.savePlan(resumed)
+        val next = repository.complete(command(resumed), clock).single()
+        assertEquals(event.itemId, next.itemId); assertEquals(1, next.ordinal)
+        assertEquals(2, repository.planEvents(plan.id).size)
+        assertFalse(repository.planEvents(plan.id).first().isValid())
+    }
+
+    @Test fun midnightContinuationKeepsTrainingDateAndNewOperationTime() = runBlocking {
+        val plan = plan(); repository.savePlan(plan)
+        val afterMidnight = Clock.fixed(Instant.parse("2026-10-24T16:01:00Z"), clock.zone)
+        val event = repository.complete(command(plan).copy(continuePreviousDay = true), afterMidnight).single()
+        assertEquals("2026-10-24", event.trainingDate); assertEquals(afterMidnight.millis(), event.recordedAt)
+        FitnessValidation.snapshot(repository.snapshot())
+        assertEquals(mapOf("2026-10-24" to 1), repository.observeDailyCounts(FitnessFilter("2026-10-24", "2026-10-25")).first())
+    }
+
+    @Test fun personalEditsDoNotRewriteExistingPlanOrEventSnapshots() = runBlocking {
+        val personal = exercise.copy(id = "USR-test", personal = true)
+        repository.saveExercise(personal)
+        val value = FitnessRules.newPlan("2026-10-24")
+        val day = FitnessRules.addExercise(value.days.single(), personal)
+        val plan = value.copy(days = listOf(day.copy(items = day.items.map { it.copy(targetSets = 4, targetValue = 12) })))
+        repository.savePlan(plan); val event = repository.complete(command(plan), clock).single()
+        repository.saveExercise(personal.copy(name = "新的名称", primaryPart = FitnessPart.Legs, archived = true))
+        assertEquals(event.exercise, repository.planEvents(plan.id).single().exercise)
+        assertEquals(FitnessPart.Chest, repository.currentData().plans.single().days.single().items.single().exercise.primaryPart)
+    }
+
+    @Test fun foreignItemIdentityCannotStealAnotherPlansRecords() = runBlocking {
+        val first = plan(); repository.savePlan(first); repository.complete(command(first), clock)
+        val other = first.copy(id = fitnessId(), name = "另一份计划")
+        assertTrue(runCatching { repository.savePlan(other) }.isFailure)
+        assertEquals(listOf(first.id), repository.currentData().plans.map { it.id })
+        assertEquals(1, repository.planEvents(first.id).size)
+    }
+
+    @Test fun staleDraftCannotSilentlyUnarchiveItsPlan() = runBlocking {
+        val plan = plan(); repository.savePlan(plan)
+        val draft = FitnessDraft(plan, true, plan.start, savedAt = clock.millis())
+        repository.saveDraft(draft); repository.archive(plan.id, true)
+        assertTrue(runCatching { repository.savePlan(draft.plan, clearDraft = true) }.isFailure)
+        assertEquals(FitnessPlanStatus.Archived, repository.currentData().plans.single().status)
+        assertEquals(draft, repository.currentData().draft)
+        repository.archive(plan.id, false); repository.savePlan(draft.plan, clearDraft = true)
         assertNull(repository.currentData().draft)
     }
 }

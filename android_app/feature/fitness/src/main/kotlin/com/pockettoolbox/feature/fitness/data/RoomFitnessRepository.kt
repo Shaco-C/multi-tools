@@ -47,6 +47,8 @@ class RoomFitnessRepository(private val database: FitnessDatabase) : FitnessRepo
         dao.observeEvents(filter.start, filter.end, filter.planId, filter.purpose?.name, limit.coerceIn(1, 5000), exerciseId, part?.name, unit?.name, side?.name).map { it.map(FitnessEventRow::toEvent) }.flowOn(Dispatchers.IO)
     override suspend fun itemEvents(itemId: String): List<FitnessSetEvent> = dao.itemEvents(itemId).map { it.toEvent() }
     override suspend fun recentExercises(today: String): List<String> = dao.recentExercises(today)
+    override fun observeDailyCounts(filter: FitnessFilter) = dao.observeDailyCounts(filter.start, filter.end, filter.planId, filter.purpose?.name)
+        .map { rows -> rows.associate { it.itemId to it.completed } }.flowOn(Dispatchers.IO)
     override fun observeProgress(date: String, planId: String?) = dao.observeProgress(date, planId).map { it.associate { row -> row.itemId to row.completed } }
     override fun observeSummary(filter: FitnessFilter) = dao.observeSummary(filter.start, filter.end, filter.planId, filter.purpose?.name).map { it.toSummary() }
     override fun observeCounts(filter: FitnessFilter, byExercise: Boolean) =
@@ -78,6 +80,8 @@ class RoomFitnessRepository(private val database: FitnessDatabase) : FitnessRepo
     override suspend fun savePlan(plan: FitnessPlan, clearDraft: Boolean) = operationMutex.withLock {
         database.withTransaction {
             val old = dao.plan(plan.id)?.toPlan()
+            require(old == null || old.status == FitnessPlanStatus.Active) { "计划已归档，请先明确取消归档，再继续编辑；草稿已保留" }
+            require(old == null || plan.status == old.status) { "请通过归档操作变更计划状态" }
             val events = dao.planEvents(plan.id).map { it.toEvent() }
             FitnessRules.validatePlan(plan, old, events)
             writePlan(plan, old)

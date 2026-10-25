@@ -7,10 +7,13 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.pockettoolbox.core.designsystem.ToolboxColors
@@ -35,13 +38,15 @@ internal fun FitnessTimeline(vm: FitnessViewModel, selected: String, plan: Fitne
                     }
                 }
                 OutlinedButton(onClick = { onDate(date) }, modifier = Modifier.widthIn(min = 72.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(containerColor = if (date == selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface), contentPadding = PaddingValues(8.dp)) {
+                    colors = ButtonDefaults.outlinedButtonColors(containerColor = if (date == selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface), contentPadding = PaddingValues(8.dp)) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         labels.forEach { Text(it, style = MaterialTheme.typography.labelSmall) }
                         if (parts.size > 2) Text("+${parts.size - 2}", style = MaterialTheme.typography.labelSmall)
-                        Text("●", color = MaterialTheme.colorScheme.secondary)
+                        val recorded = vm.timelineCounts[date] ?: 0
+                        Text(if (recorded > 0) "●" else "○", color = MaterialTheme.colorScheme.secondary)
                         Text(date.substring(5), fontWeight = FontWeight.Bold)
                         Text(if (date == vm.today) "今天" else listOf("一", "二", "三", "四", "五", "六", "日")[LocalDate.parse(date).dayOfWeek.value - 1], style = MaterialTheme.typography.labelSmall)
+                        if (recorded > 0) Text("已记${recorded}条", style = MaterialTheme.typography.labelSmall)
                     }
                 }
             }
@@ -67,7 +72,7 @@ internal fun LazyListScope.fitnessToday(
     }
     val pending = todayRows.filter { it.completed < (it.item.targetSets ?: 0) }
     val preferred = pending.firstOrNull { it.item.id == vm.focusItemId } ?: pending.firstOrNull { it.item.id == vm.data.preferences.lastItemId } ?: pending.firstOrNull()
-    item("today-intro") { Text("${vm.today} · 每完成一组，手动确认一下。", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    item("today-intro") { Text("${vm.today} · 不限动作顺序，做完哪一组就记哪一组。", color = MaterialTheme.colorScheme.onSurfaceVariant) }
     item("today-primary") {
         FitnessCard {
             val label = when {
@@ -101,11 +106,11 @@ internal fun LazyListScope.fitnessToday(
                     Text(if (vm.streak.days == 0) "从下一次训练开始" else if (vm.streak.anchor == vm.today) "截至今天" else "截至昨天", color = androidx.compose.ui.graphics.Color.White, style = MaterialTheme.typography.labelSmall)
                 }
             }
-            Card(Modifier.weight(1f)) {
+            Card(Modifier.weight(1f), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("今日计划部位")
                     Text(todayParts.joinToString(" · ") { it.label }.ifEmpty { if (todayRows.isNotEmpty()) "活动训练" else if (todayDays.isNotEmpty() && todayDays.all { it.kind == FitnessDayKind.Rest }) "休息" else "未安排" }, fontWeight = FontWeight.Bold)
-                    val practiced = todayRows.filter { it.completed > 0 }.mapNotNull { it.item.exercise.primaryPart }.toSet().intersect(todayParts.toSet()).size
+                    val practiced = vm.todayPracticedParts.intersect(todayParts.toSet()).size
                     Text(if (todayParts.isEmpty()) "按自己的节奏安排" else "已练$practiced/${todayParts.size}主部位\n不代表目标全部完成", style = MaterialTheme.typography.labelSmall)
                 }
             }
@@ -144,52 +149,50 @@ internal fun LazyListScope.fitnessToday(
     for ((id, group) in grouped) {
         item("plan-label-$id") { TextButton(onClick = { onPlan(id, selectedDate) }) { Text("${group.first().plan.name} · 查看计划 ›") } }
         items(group, key = { it.item.id }) { row ->
-            FitnessWorkout(vm, row, rows, onDetail, onBackfill, onConfirm, onRecords,
-                onFocus = { target -> onFocus(target, indexes[target.item.id] ?: 5) })
+            FitnessWorkout(vm, row, onDetail, onBackfill, onConfirm, onRecords)
         }
     }
     item { if (vm.dayEvents.isNotEmpty()) OutlinedButton(onClick = onTodayRecords, enabled = selectedDate == vm.today) { Text("查看今日全部有效记录") } }
 }
 
 @Composable
-private fun FitnessWorkout(vm: FitnessViewModel, row: FitnessScheduledItem, rows: List<FitnessScheduledItem>, onDetail: (String) -> Unit,
-    onBackfill: (FitnessScheduledItem) -> Unit, onConfirm: (FitnessConfirmation) -> Unit, onRecords: (FitnessScheduledItem) -> Unit,
-    onFocus: (FitnessScheduledItem) -> Unit) {
-    val focused = vm.focusItemId == row.item.id
-    val hasFocus = rows.any { it.item.id == vm.focusItemId }
-    val compact = hasFocus && !focused && (row.day.date == vm.today || vm.isContinuing(row))
+private fun FitnessWorkout(vm: FitnessViewModel, row: FitnessScheduledItem, onDetail: (String) -> Unit,
+    onBackfill: (FitnessScheduledItem) -> Unit, onConfirm: (FitnessConfirmation) -> Unit, onRecords: (FitnessScheduledItem) -> Unit) {
+    var menu by remember { mutableStateOf(false) }
     val done = row.completed >= (row.item.targetSets ?: 0)
-    FitnessCard {
-        if (compact) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) { Text(row.item.exercise.name, fontWeight = FontWeight.Bold); Text("${row.completed}/${row.item.targetSets} · ${if (done) "组数已记完" else "尚有剩余"}", style = MaterialTheme.typography.labelSmall) }
-            OutlinedButton(onClick = { onFocus(row) }) { Text(if (done) "查看动作" else "切到此动作") }
-        } else {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                val exercise = vm.exercises.firstOrNull { it.id == row.item.exercise.exerciseId }
-                Box(Modifier.size(76.dp).clickable { onDetail(row.item.exercise.exerciseId) }) {
-                    FitnessMedia(vm.dependencies, exercise?.images?.lastOrNull(), vm.data.mediaGeneration, "查看${row.item.exercise.name}教学", Modifier.fillMaxSize(), width = 76.dp, height = 76.dp)
+    FitnessCard(Modifier.testTag("fitness-workout-${row.item.id}")) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            val exercise = vm.exercises.firstOrNull { it.id == row.item.exercise.exerciseId }
+            Box(Modifier.size(48.dp).clickable { onDetail(row.item.exercise.exerciseId) }) {
+                FitnessMedia(vm.dependencies, exercise?.images?.lastOrNull(), vm.data.mediaGeneration, "查看${row.item.exercise.name}教学", Modifier.fillMaxSize(), width = 48.dp, height = 48.dp)
+            }
+            Column(Modifier.weight(1f)) {
+                Text(row.item.exercise.name, fontWeight = FontWeight.Bold, modifier = Modifier.clickable { onDetail(row.item.exercise.exerciseId) })
+                Text(row.item.measurement(), style = MaterialTheme.typography.bodySmall)
+            }
+            Text("${row.completed}/${row.item.targetSets}", style = MaterialTheme.typography.titleLarge)
+            Box {
+                IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, contentDescription = "${row.item.exercise.name}更多操作") }
+                DropdownMenu(menu, onDismissRequest = { menu = false }) {
+                    DropdownMenuItem(text = { Text("组明细") }, onClick = { menu = false; onRecords(row) })
+                    DropdownMenuItem(text = { Text("查看教学") }, onClick = { menu = false; onDetail(row.item.exercise.exerciseId) })
+                    DropdownMenuItem(text = { Text("结束剩余安排") }, enabled = !vm.busy, onClick = {
+                        menu = false
+                        onConfirm(FitnessConfirmation("结束剩余安排", "已完成和撤销记录保留；同日重加会恢复原身份和进度。若本计划尚无记录且无其他安排，将归档保留计划。") { vm.stop(row) })
+                    })
                 }
-                Column(Modifier.weight(1f)) {
-                    TextButton(onClick = { onDetail(row.item.exercise.exerciseId) }, contentPadding = PaddingValues(0.dp)) { Text(row.item.exercise.name, fontWeight = FontWeight.Bold) }
-                    Text(row.item.measurement(), style = MaterialTheme.typography.bodySmall)
-                }
-            }
-            Text("${row.completed} / ${row.item.targetSets} ${if (row.item.exercise.purpose == FitnessPurpose.Strength) "组" else "段"}", style = MaterialTheme.typography.headlineMedium)
-            LinearProgressIndicator(progress = { (row.completed.toFloat() / (row.item.targetSets ?: 1).coerceAtLeast(1)).coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
-            Button(onClick = { if (row.day.date < vm.today && !vm.isContinuing(row)) onBackfill(row) else vm.complete(row) },
-                enabled = !vm.busy && !done && row.day.date <= vm.today, modifier = Modifier.fillMaxWidth().heightIn(min = 58.dp)) {
-                Text(if (row.day.date > vm.today) "未来日期仅预览" else if (done) "目标组数已记录" else if (row.day.date < vm.today && !vm.isContinuing(row)) "补记已完成的组/段" else "完成第${row.completed + 1}${if (row.item.exercise.purpose == FitnessPurpose.Strength) "组" else "段"}")
-            }
-            if (row.day.date < vm.today && vm.isContinuing(row)) FitnessHint("正在继续${row.day.date}的训练，新组仍记在原日。")
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                TextButton(onClick = { onRecords(row) }, enabled = !vm.busy) { Text("组明细") }
-                TextButton(onClick = { vm.undoLast(row) }, enabled = !vm.busy && row.completed > 0) { Text("撤销第${row.completed}${if (row.item.exercise.purpose == FitnessPurpose.Strength) "组" else "段"}") }
-            }
-            TextButton(onClick = { onConfirm(FitnessConfirmation("结束剩余安排", "已完成和撤销记录保留；同日重加会恢复原身份和进度。若本计划尚无记录且无其他安排，将归档保留计划。") { vm.stop(row) }) }, enabled = !vm.busy) { Text("结束此动作剩余安排") }
-            if (focused && done) rows.firstOrNull { it.completed < (it.item.targetSets ?: 0) }?.let { next ->
-                OutlinedButton(onClick = { onFocus(next) }, modifier = Modifier.fillMaxWidth()) { Text("下一个动作：${next.item.exercise.name}") }
             }
         }
+        LinearProgressIndicator(progress = { (row.completed.toFloat() / (row.item.targetSets ?: 1).coerceAtLeast(1)).coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.secondary, trackColor = MaterialTheme.colorScheme.primaryContainer)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Button(onClick = { if (row.day.date < vm.today && !vm.isContinuing(row)) onBackfill(row) else vm.complete(row) },
+                enabled = !vm.busy && !done && row.day.date <= vm.today, modifier = Modifier.weight(1f).heightIn(min = 48.dp).testTag("fitness-complete-${row.item.id}")) {
+                Text(if (row.day.date > vm.today) "未来日期仅预览" else if (done) "目标组数已记录" else if (row.day.date < vm.today && !vm.isContinuing(row)) "补记已完成的组/段" else "完成第${row.completed + 1}${if (row.item.exercise.purpose == FitnessPurpose.Strength) "组" else "段"}")
+            }
+            TextButton(onClick = { vm.undoLast(row) }, enabled = !vm.busy && row.completed > 0) { Text("撤销一组") }
+        }
+        if (row.day.date < vm.today && vm.isContinuing(row)) Text("继续${row.day.date}的训练，新组仍记在原日。", style = MaterialTheme.typography.labelSmall)
     }
 }
 
@@ -223,7 +226,7 @@ internal fun LazyListScope.fitnessPlans(vm: FitnessViewModel, onEditor: (Fitness
 }
 
 internal fun LazyListScope.fitnessPlanDetail(vm: FitnessViewModel, planId: String?, date: String, onDate: (String) -> Unit,
-    onEditor: (FitnessEditorRequest) -> Unit, onFocus: (FitnessScheduledItem, Int) -> Unit, onDetail: (String) -> Unit,
+    onEditor: (FitnessEditorRequest) -> Unit, onDetail: (String) -> Unit,
     onBackfill: (FitnessScheduledItem) -> Unit, onConfirm: (FitnessConfirmation) -> Unit, onCopy: (FitnessPlanDay) -> Unit,
     onRecords: (FitnessScheduledItem) -> Unit) {
     val plan = vm.data.plans.firstOrNull { it.id == planId }
@@ -255,8 +258,12 @@ internal fun LazyListScope.fitnessPlanDetail(vm: FitnessViewModel, planId: Strin
     } else {
         val rows = vm.scheduled()
         if (rows.isEmpty()) item { FitnessEmpty("这一天当前无剩余安排；原记录仍可在下方回看。") }
-        items(rows, key = { it.item.id }) { row -> FitnessWorkout(vm, row, rows, onDetail, onBackfill, onConfirm, onRecords,
-            onFocus = { target -> onFocus(target, 3 + rows.indexOfFirst { it.item.id == target.item.id }.coerceAtLeast(0)) }) }
+        items(rows, key = { it.item.id }) { row -> FitnessWorkout(vm, row, onDetail, onBackfill, onConfirm, onRecords) }
+        items(day?.items.orEmpty().filter { it.status == FitnessItemStatus.Stopped }, key = { "stopped-${it.id}" }) { item -> FitnessCard {
+            Text("${item.exercise.name} · 已结束剩余安排", fontWeight = FontWeight.Bold)
+            Text("历史保留，不参与当前剩余目标。")
+            TextButton(onClick = { vm.records(item.id) }, enabled = !vm.busy) { Text("查看完成与撤销明细") }
+        } }
     }
     item { Text("当日实际记录（最近200条，完整明细可按动作查看）", fontWeight = FontWeight.Bold) }
     items(vm.dayEvents, key = { "event-${it.id}" }) { event -> FitnessCard {

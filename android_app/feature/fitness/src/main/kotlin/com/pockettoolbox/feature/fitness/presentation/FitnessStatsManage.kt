@@ -18,47 +18,93 @@ internal fun LazyListScope.fitnessStats(vm: FitnessViewModel, onCount: (FitnessC
     onDetail: (String) -> Unit, onRecord: (FitnessSetEvent) -> Unit) {
     val filter = vm.statsFilter
     item("statistics-filter") { FitnessCard {
-        Text("训练统计", style = MaterialTheme.typography.titleLarge)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        var expanded by rememberSaveable { mutableStateOf(false) }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             listOf(7, 30).forEach { days -> OutlinedButton(onClick = { vm.setStats(filter.copy(start = FitnessRules.date(vm.today).minusDays(days - 1L).toString(), end = vm.today)) }) { Text("近${days}天") } }
+            TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "收起筛选" else "筛选 / 自定义") }
         }
-        FitnessDateField("开始日期", filter.start) { vm.setStats(filter.copy(start = it)) }
-        FitnessDateField("结束日期", filter.end) { vm.setStats(filter.copy(end = it)) }
-        FitnessChoice("计划范围", filter.planId.orEmpty(), listOf("" to "全部计划（含归档）") + vm.data.plans.map { it.id to "${it.name}${if (it.status == FitnessPlanStatus.Archived) " · 已归档" else ""}" }, { vm.setStats(filter.copy(planId = it.ifBlank { null })) })
-        FitnessChoice("明细用途", filter.purpose?.name.orEmpty(), listOf("" to "全部用途") + FitnessPurpose.entries.map { it.name to it.label }, { vm.setStats(filter.copy(purpose = it.takeIf(String::isNotBlank)?.let(FitnessPurpose::valueOf))) })
-        FitnessChoice("统计维度", if (vm.statsByExercise) "exercise" else "part", listOf("part" to "按主练部位 / 用途", "exercise" to "按具体动作"), { vm.setStats(filter, it == "exercise") })
-    } }
-    item("statistics-overview") { FitnessCard {
-        Text("所选日期与计划 · 全用途概览", fontWeight = FontWeight.Bold)
+        Text("${filter.start} — ${filter.end} · ${vm.data.plans.firstOrNull { it.id == filter.planId }?.name ?: "全部计划"}", style = MaterialTheme.typography.labelSmall)
+        if (expanded) {
+            FitnessDateField("开始日期", filter.start) { vm.setStats(filter.copy(start = it)) }
+            FitnessDateField("结束日期", filter.end) { vm.setStats(filter.copy(end = it)) }
+            FitnessChoice("计划范围", filter.planId.orEmpty(), listOf("" to "全部计划（含归档）") + vm.data.plans.map { it.id to "${it.name}${if (it.status == FitnessPlanStatus.Archived) " · 已归档" else ""}" }, { vm.setStats(filter.copy(planId = it.ifBlank { null })) })
+            FitnessChoice("明细用途", filter.purpose?.name.orEmpty(), listOf("" to "全部用途") + FitnessPurpose.entries.map { it.name to it.label }, { vm.setStats(filter.copy(purpose = it.takeIf(String::isNotBlank)?.let(FitnessPurpose::valueOf))) })
+            FitnessChoice("排序", if (vm.statsFixedOrder) "fixed" else "count", listOf("count" to "数量从多到少", "fixed" to "固定部位 / 名称顺序"), { vm.statsOrder(it == "fixed") })
+        }
         val overview = vm.statsOverview
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("训练日 ${overview.trainingDays}"); Text("力量 ${overview.strengthSets}组") }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("有氧 ${overview.cardioSegments}段"); Text("动作 ${overview.exercises}个") }
-        Text("训练日按自然日去重，至少完成1组力量或1段有氧计入。热身、拉伸单独统计。撤销记录不计入。", style = MaterialTheme.typography.bodySmall)
-    } }
-    if (vm.statsCounts.isEmpty()) item("statistics-empty") { FitnessEmpty("该范围尚无有效记录。过去日期可从计划详情明确补记。") }
-    items(vm.statsCounts, key = { "count-${it.key}" }) { row -> FitnessCard {
-        Text(row.name, style = MaterialTheme.typography.titleMedium)
-        Text("${row.days}个训练日 · ${row.segments}${if (row.purpose == FitnessPurpose.Strength) "组" else "段"}")
-        if (vm.statsByExercise) {
-            if (row.side == FitnessSide.Each) Text("已填实际：左${row.actualLeft}${row.unit.label}（${row.leftFilled}/${row.segments}） · 右${row.actualRight}${row.unit.label}（${row.rightFilled}/${row.segments}）")
-            else Text("已填实际累计：${row.actualTotal}${row.unit.label} · 填写覆盖${row.totalFilled}/${row.segments}组/段")
-            Text("未填实际值不按目标推算。", style = MaterialTheme.typography.bodySmall)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            listOf("训练日" to "${overview.trainingDays}天", "力量" to "${overview.strengthSets}组", "有氧" to "${overview.cardioSegments}段", "动作" to "${overview.exercises}个").forEach { (label, value) ->
+                Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) { Text(value, fontWeight = FontWeight.Bold); Text(label, style = MaterialTheme.typography.labelSmall) }
+            }
         }
-        Row { TextButton(onClick = { onCount(row) }) { Text("查看组成记录") }
-            if (vm.statsByExercise) TextButton(onClick = { onDetail(row.key.substringBefore('|')) }) { Text("动作教学") } }
     } }
-    item("statistics-events-title") { Text("最近有效记录（当前范围，最多200条）", style = MaterialTheme.typography.titleMedium) }
-    items(vm.statsRecords, key = { "stats-event-${it.id}" }) { event -> FitnessCard {
-        Text(event.exercise.name, fontWeight = FontWeight.Bold); Text(fitnessEventTime(event), style = MaterialTheme.typography.bodySmall)
-        TextButton(onClick = { onRecord(event) }) { Text("打开当日计划与组明细") }
+    val counts = if (vm.statsFixedOrder) vm.statsCounts.sortedWith(compareBy<FitnessCount> {
+        if (vm.statsByExercise) 0 else FitnessPart.entries.indexOfFirst { part -> part.name == it.key }.let { index -> if (index < 0) 100 else index }
+    }.thenBy { it.name }) else vm.statsCounts.sortedWith(compareByDescending<FitnessCount> { if (vm.statsByDays) it.days else it.segments }.thenBy { it.key })
+    item("statistics-chart-card") { FitnessCard {
+        val chipColors = FilterChipDefaults.filterChipColors(selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf("part" to "按部位", "exercise" to "按动作", "daily" to "每日记录").forEach { (key, label) ->
+                val active = if (key == "daily") vm.statsDaily else !vm.statsDaily && vm.statsByExercise == (key == "exercise")
+                FilterChip(selected = active, onClick = { vm.statsView(key == "daily", key == "exercise") }, label = { Text(label) }, colors = chipColors)
+            }
+        }
+        if (!vm.statsDaily) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Text(filter.purpose?.label ?: "全部用途", style = MaterialTheme.typography.labelMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FilterChip(vm.statsByDays, { vm.statsMetric(true) }, label = { Text("天次") }, colors = chipColors)
+                    FilterChip(!vm.statsByDays, { vm.statsMetric(false) }, label = { Text("组 / 段数") }, colors = chipColors)
+                }
+            }
+            if (counts.isNotEmpty()) {
+                val scopeKey = "${filter.start}/${filter.end}/${filter.planId}/${filter.purpose}/${vm.statsByExercise}/${vm.statsByDays}/${vm.statsFixedOrder}"
+                var page by rememberSaveable(scopeKey) { mutableIntStateOf(0) }
+                var selected by rememberSaveable(scopeKey) { mutableStateOf<String?>(null) }
+                val pages = (counts.size + 11) / 12
+                val currentPage = page.coerceIn(0, pages - 1)
+                val visible = counts.drop(currentPage * 12).take(12)
+                val selectedRow = visible.firstOrNull { it.key == selected } ?: visible.first()
+                val maximum = fitnessChartMaximum(counts.maxOf { if (vm.statsByDays) it.days else it.segments })
+                FitnessStatisticsChart(visible, vm.statsByDays, maximum, selectedRow.key) { selected = it }
+                if (pages > 1) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    TextButton(onClick = { page = currentPage - 1; selected = null }, enabled = currentPage > 0) { Text("上一页") }
+                    Text("${currentPage + 1} / $pages · 共${counts.size}项", style = MaterialTheme.typography.labelSmall)
+                    TextButton(onClick = { page = currentPage + 1; selected = null }, enabled = currentPage + 1 < pages) { Text("下一页") }
+                }
+                FitnessChoice("当前项目（也可点图选择）", selectedRow.key, visible.map { it.key to it.name }, { selected = it })
+                Text("${selectedRow.days}个${if (selectedRow.purpose.countsTrainingDay) "训练" else "活动"}日 · ${selectedRow.segments}${if (selectedRow.purpose == FitnessPurpose.Strength) "组" else "段"}", style = MaterialTheme.typography.bodySmall)
+                if (vm.statsByExercise) FitnessActualSummary(selectedRow)
+                Row {
+                    TextButton(onClick = { onCount(selectedRow) }) { Text("查看组成记录") }
+                    if (vm.statsByExercise) TextButton(onClick = { onDetail(selectedRow.key.substringBefore('|')) }) { Text("动作教学") }
+                }
+            }
+        }
+        if (counts.isEmpty()) Text("该范围尚无有效记录。过去日期可从计划详情明确补记。")
     } }
+    item("statistics-scope-note") { Text("同一天的部位天次不相加作为总训练天数；辅助参与不重复累计主练组数。", style = MaterialTheme.typography.bodySmall) }
+    if (vm.statsDaily) {
+        item("statistics-events-title") { Text("有效记录（当前范围，最多200条）", style = MaterialTheme.typography.titleMedium) }
+        items(vm.statsRecords, key = { "stats-event-${it.id}" }) { event -> FitnessCard {
+            Text(event.exercise.name, fontWeight = FontWeight.Bold); Text(fitnessEventTime(event), style = MaterialTheme.typography.bodySmall)
+            TextButton(onClick = { onRecord(event) }) { Text("打开当日计划与组明细") }
+        } }
+    }
+}
+
+@Composable
+private fun FitnessActualSummary(row: FitnessCount) {
+    if (row.side == FitnessSide.Each) Text("已填实际：左${if (row.leftFilled > 0) "${row.actualLeft}${row.unit.label}" else "未填"}（${row.leftFilled}/${row.segments}） · 右${if (row.rightFilled > 0) "${row.actualRight}${row.unit.label}" else "未填"}（${row.rightFilled}/${row.segments}）")
+    else Text(if (row.totalFilled == 0) "实际值尚未填写 · 0/${row.segments}组/段已填" else "已填实际累计：${row.actualTotal}${row.unit.label} · 填写覆盖${row.totalFilled}/${row.segments}组/段")
 }
 
 internal fun LazyListScope.fitnessManage(vm: FitnessViewModel, onCustom: (String?) -> Unit, onSources: () -> Unit, onExit: () -> Unit) {
     item("manage-equipment") { FitnessCard {
         Text("我的器械", style = MaterialTheme.typography.titleLarge)
-        Text("筛选采用完整条件。双哑铃包含单哑铃；弹力带动作也可能需要稳定固定点。")
-        FitnessEquipmentLabels.forEach { (key, label) -> Row {
+        Text("中文样稿按器械组合筛选；来源动作按原器械标签筛选，配套器械请看原图。双哑铃包含单哑铃。")
+        FitnessEquipmentLabels.filterKeys { it != "sourceEquipmentUnknown" }.forEach { (key, label) -> Row {
             Checkbox(key in vm.data.preferences.equipment, onCheckedChange = { checked ->
                 val old = vm.data.preferences
                 vm.preferences(old.copy(equipment = if (checked) old.equipment + key else old.equipment - key))
@@ -78,8 +124,8 @@ internal fun LazyListScope.fitnessManage(vm: FitnessViewModel, onCustom: (String
     item("manage-content") { FitnessCard {
         Text("动作内容与来源", style = MaterialTheme.typography.titleLarge)
         val content = vm.catalog
-        Text("版本 ${content?.version.orEmpty()}\n${content?.sourceCount ?: 0}条完整来源资料 · ${content?.exercises?.size ?: 0}个中文开发样本 · ${content?.reviewedCount ?: 0}个专业审核通过")
-        FitnessHint("当前为开发内容。来源资料的中文校订、器械与计量映射、教学图及肌肉图审核仍在进行，不能将876条来源记录视为876个已完成教学动作。", true)
+        Text("版本 ${content?.version.orEmpty()}\n${content?.selectableExercises?.size ?: 0}个内置可选动作：${content?.sourceCount ?: 0}个来源动作＋${content?.exercises?.size ?: 0}个中文样稿 · ${content?.reviewedCount ?: 0}个专业审核通过")
+        FitnessHint("来源动作保留英文说明与原图。中文教学和专业审校尚未完成，器械与动作细节请结合原图确认；记录单位可在首次记组前调整。")
         TextButton(onClick = onSources, enabled = !vm.busy) { Text("浏览全部来源资料") }
         Text("原始动作与图片：yuhonas/free-exercise-db（Unlicense），固定版本${content?.sourceRevision.orEmpty()}。中文样本图与肌肉示意图的出处见仓库素材说明；肌肉图为示意，存在待补图部位。", style = MaterialTheme.typography.bodySmall)
         TextButton(onClick = onExit, enabled = !vm.busy) { Text("返回工具箱") }

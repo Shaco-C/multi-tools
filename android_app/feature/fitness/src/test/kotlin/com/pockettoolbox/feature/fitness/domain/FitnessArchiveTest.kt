@@ -95,4 +95,11 @@ class FitnessArchiveTest {
         assertThrows(IllegalArgumentException::class.java) { FitnessLimitedInput(ByteArrayInputStream(ByteArray(5)), 4).readBytes() }
         assertThrows(IllegalArgumentException::class.java) { FitnessLimitedOutput(ByteArrayOutputStream(), 4).write(ByteArray(5)) }
     }
+    @Test fun exportCapacityIncludesManifestJustLikeImportCapacity() {
+        val metadata = 1024L; val manifest = 512L
+        FitnessArchive.validateExpandedSize(metadata, FitnessArchive.MAX_ARCHIVE_BYTES - metadata - manifest, manifest)
+        assertThrows(IllegalArgumentException::class.java) {
+            FitnessArchive.validateExpandedSize(metadata, FitnessArchive.MAX_ARCHIVE_BYTES - metadata - manifest + 1, manifest)
+        }
+    }
 }

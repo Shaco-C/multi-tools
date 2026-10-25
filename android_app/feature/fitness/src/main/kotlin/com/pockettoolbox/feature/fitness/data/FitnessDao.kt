@@ -53,6 +53,12 @@ interface FitnessDao {
         AND (:planId IS NULL OR planId = :planId) GROUP BY itemId""")
     fun observeProgress(date: String, planId: String?): Flow<List<FitnessProgressRow>>
 
+    @Query("""SELECT trainingDate AS itemId, COUNT(*) AS completed FROM fitness_events
+        WHERE status = 'Valid' AND trainingDate BETWEEN :start AND :end
+        AND (:planId IS NULL OR planId = :planId) AND (:purpose IS NULL OR purpose = :purpose)
+        GROUP BY trainingDate""")
+    fun observeDailyCounts(start: String, end: String, planId: String?, purpose: String?): Flow<List<FitnessProgressRow>>
+
     @Query("""SELECT COUNT(DISTINCT CASE WHEN purpose IN ('Strength','Cardio') THEN trainingDate END) AS trainingDays,
         COALESCE(SUM(CASE WHEN purpose = 'Strength' THEN 1 ELSE 0 END), 0) AS strengthSets,
         COALESCE(SUM(CASE WHEN purpose = 'Cardio' THEN 1 ELSE 0 END), 0) AS cardioSegments,

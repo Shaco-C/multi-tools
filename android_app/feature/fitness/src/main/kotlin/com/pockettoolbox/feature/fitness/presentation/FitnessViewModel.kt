@@ -21,6 +21,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -35,10 +36,14 @@ data class FitnessDaySelection(val date: String, val planId: String? = null)
 @OptIn(ExperimentalCoroutinesApi::class)
 class FitnessViewModel(
     val dependencies: FitnessFeatureDependencies,
-    private val clock: Clock = Clock.systemDefaultZone(),
+    clockOverride: Clock? = null,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val repository: FitnessRepository = dependencies.repository,
+    private val elapsedMillis: () -> Long = { System.nanoTime() / 1_000_000 },
+    private val initialize: suspend () -> FitnessCatalogDocument = dependencies::initialize,
 ) : ViewModel() {
-    private val repository = dependencies.repository
+    private val suppliedClock = clockOverride
+    private val clock: Clock get() = suppliedClock ?: Clock.systemDefaultZone()
     var now by mutableLongStateOf(clock.millis()); private set
     var data by mutableStateOf(FitnessData()); private set
     var catalog by mutableStateOf<FitnessCatalogDocument?>(null); private set
@@ -48,10 +53,12 @@ class FitnessViewModel(
     var today by mutableStateOf(LocalDate.now(clock).toString()); private set
     val zoneId get() = clock.zone
     private val selection = MutableStateFlow(FitnessDaySelection(today))
-    val selected: FitnessDaySelection get() = selection.value
+    var selected by mutableStateOf(selection.value); private set
     var dayEvents by mutableStateOf<List<FitnessSetEvent>>(emptyList()); private set
     var dayProgress by mutableStateOf<Map<String, Int>>(emptyMap()); private set
     var todayProgress by mutableStateOf<Map<String, Int>>(emptyMap()); private set
+    var timelineCounts by mutableStateOf<Map<String, Int>>(emptyMap()); private set
+    var todayPracticedParts by mutableStateOf<Set<FitnessPart>>(emptySet()); private set
     var itemRecords by mutableStateOf<List<FitnessSetEvent>?>(null); private set
     private val recordScope = MutableStateFlow<FitnessRecordScope?>(null)
     var scopedRecords by mutableStateOf<List<FitnessSetEvent>>(emptyList()); private set
@@ -61,6 +68,7 @@ class FitnessViewModel(
     var recoveryError by mutableStateOf<String?>(null); private set
     var focusItemId by mutableStateOf<String?>(null); private set
     private var session: Pair<String, String>? = null
+    private var completionGuard: Pair<String, Long>? = null
     private val todayFlow = MutableStateFlow(today)
     private var loadJob: Job? = null
     private var recoveryJob: Job? = null
@@ -69,6 +77,9 @@ class FitnessViewModel(
     private val statsFlow = MutableStateFlow(statsFilter)
     private val statsMode = MutableStateFlow(false)
     var statsByExercise by mutableStateOf(false); private set
+    var statsByDays by mutableStateOf(true); private set
+    var statsDaily by mutableStateOf(false); private set
+    var statsFixedOrder by mutableStateOf(false); private set
     var statsOverview by mutableStateOf(FitnessSummary()); private set
     var statsCounts by mutableStateOf<List<FitnessCount>>(emptyList()); private set
     var statsRecords by mutableStateOf<List<FitnessSetEvent>>(emptyList()); private set
@@ -85,7 +96,7 @@ class FitnessViewModel(
     var pendingRestore by mutableStateOf<InspectedFitnessArchive?>(null); private set
     private val noticesChannel = Channel<FitnessNotice>(Channel.BUFFERED)
     val notices = noticesChannel.receiveAsFlow()
-    val exercises: List<FitnessExercise> get() = catalog?.exercises.orEmpty() + data.personalExercises
+    val exercises: List<FitnessExercise> get() = catalog?.selectableExercises.orEmpty() + data.personalExercises
 
     init { load() }
 
@@ -94,20 +105,28 @@ class FitnessViewModel(
         loadJob = viewModelScope.launch {
             try {
                 loadError = null
-                catalog = withContext(ioDispatcher) { dependencies.initialize() }
-                launch { selection.flatMapLatest { repository.observeEvents(FitnessFilter(it.date, it.date, it.planId), 200) }.collect { dayEvents = it } }
-                launch { selection.flatMapLatest { repository.observeProgress(it.date, it.planId) }.collect { dayProgress = it } }
-                launch { todayFlow.flatMapLatest { repository.observeProgress(it) }.collect { todayProgress = it } }
-                launch { todayFlow.flatMapLatest { date -> repository.observeTrainingDates(date).map { FitnessStatistics.streak(it, date) } }.collect { streak = it } }
-                launch { statsFlow.flatMapLatest { repository.observeSummary(it.copy(purpose = null)) }.collect { statsOverview = it } }
-                launch { combine(statsFlow, statsMode) { filter, mode -> filter to mode }.flatMapLatest { (filter, mode) -> repository.observeCounts(filter, mode) }.collect { statsCounts = it } }
-                launch { statsFlow.flatMapLatest { repository.observeEvents(it, 200) }.collect { statsRecords = it } }
-                launch { recordScope.flatMapLatest { scope -> if (scope == null) flowOf(emptyList()) else repository.observeEvents(scope.filter, scope.limit, scope.exerciseId, scope.part, scope.unit, scope.side) }.collect { scopedRecords = it } }
-                repository.data.collect { value ->
-                    data = value
-                    if (!editorVisible && !draftDirty) draft = value.draft
-                    loaded = true
-                    refreshRecovery()
+                catalog = withContext(ioDispatcher) { initialize() }
+                coroutineScope {
+                    launch { selection.flatMapLatest { repository.observeEvents(FitnessFilter(it.date, it.date, it.planId), 200) }.collect { dayEvents = it } }
+                    launch { selection.flatMapLatest { repository.observeProgress(it.date, it.planId) }.collect { dayProgress = it } }
+                    launch { todayFlow.flatMapLatest { repository.observeProgress(it) }.collect { todayProgress = it } }
+                    launch { selection.flatMapLatest {
+                        val day = FitnessRules.date(it.date)
+                        repository.observeDailyCounts(FitnessFilter(day.minusDays(3).toString(), day.plusDays(5).toString(), it.planId))
+                    }.collect { timelineCounts = it } }
+                    launch { todayFlow.flatMapLatest { repository.observeCounts(FitnessFilter(it, it, purpose = FitnessPurpose.Strength), false) }
+                        .collect { rows -> todayPracticedParts = rows.mapNotNull { row -> FitnessPart.entries.firstOrNull { it.name == row.key } }.toSet() } }
+                    launch { todayFlow.flatMapLatest { date -> repository.observeTrainingDates(date).map { FitnessStatistics.streak(it, date) } }.collect { streak = it } }
+                    launch { statsFlow.flatMapLatest { repository.observeSummary(it.copy(purpose = null)) }.collect { statsOverview = it } }
+                    launch { combine(statsFlow, statsMode) { filter, mode -> filter to mode }.flatMapLatest { (filter, mode) -> repository.observeCounts(filter, mode) }.collect { statsCounts = it } }
+                    launch { statsFlow.flatMapLatest { repository.observeEvents(it, 200) }.collect { statsRecords = it } }
+                    launch { recordScope.flatMapLatest { scope -> if (scope == null) flowOf(emptyList()) else repository.observeEvents(scope.filter, scope.limit, scope.exerciseId, scope.part, scope.unit, scope.side) }.collect { scopedRecords = it } }
+                    repository.data.collect { value ->
+                        data = value
+                        if (!editorVisible && !draftDirty) draft = value.draft
+                        loaded = true
+                        refreshRecovery()
+                    }
                 }
             } catch (error: CancellationException) { throw error }
             catch (error: Exception) { loadError = error.message ?: "健身资料读取失败，原资料未覆盖" }
@@ -123,7 +142,10 @@ class FitnessViewModel(
     fun selectDate(date: String, planId: String? = null) {
         runCatching { FitnessRules.date(date) }.onFailure { notify(it.message.orEmpty()); return }
         val next = FitnessDaySelection(date, planId)
-        if (selection.value != next) { selection.value = next; focusItemId = null }
+        if (selected != next) {
+            selected = next; selection.value = next; focusItemId = null
+            dayEvents = emptyList(); dayProgress = emptyMap(); timelineCounts = emptyMap()
+        }
     }
 
     fun scheduled(): List<FitnessScheduledItem> = data.plans.filter { it.status == FitnessPlanStatus.Active && (selected.planId == null || it.id == selected.planId) }.flatMap { plan ->
@@ -138,6 +160,11 @@ class FitnessViewModel(
     }
 
     fun complete(item: FitnessScheduledItem, count: Int = 1, backfill: Boolean = false, actualAt: Long? = null, after: () -> Unit = {}) {
+        if (busy) return
+        val key = "${item.plan.id}/${item.day.date}/${item.item.id}"
+        val tick = elapsedMillis()
+        if (!backfill && completionGuard?.let { it.first == key && tick - it.second in 0..649 } == true) return
+        if (!backfill) completionGuard = key to tick
         val request = FitnessCompletion(item.plan.id, item.day.date, item.item.id, fitnessId(), count,
             if (backfill) if (actualAt == null) FitnessTimeSource.DateOnly else FitnessTimeSource.User else FitnessTimeSource.Realtime,
             actualAt = actualAt,
@@ -151,17 +178,17 @@ class FitnessViewModel(
                 if (batchId != null) revokeBatch(batchId) else events.firstOrNull()?.let { revoke(it) }
             })
             after()
-        }, notice = false)
+        }, onError = { completionGuard = null; notify(it) }, notice = false)
     }
 
     fun isContinuing(item: FitnessScheduledItem): Boolean = session == (item.plan.id to item.day.date)
     fun revoke(event: FitnessSetEvent) = write("本组已撤销", {
         repository.revoke(event.id, clock.millis())
         repository.itemEvents(event.itemId)
-    }, after = { rows -> if (itemRecords != null) itemRecords = rows; refreshRecovery() })
+    }, after = { rows -> completionGuard = null; if (itemRecords != null) itemRecords = rows; refreshRecovery() })
     fun undoLast(item: FitnessScheduledItem) = write("上一组已撤销", {
         repository.itemEvents(item.item.id).lastOrNull { it.isValid() }?.let { repository.revoke(it.id, clock.millis()) }
-    }, after = { refreshRecovery() })
+    }, after = { completionGuard = null; refreshRecovery() })
     fun revokeBatch(id: String) {
         val itemId = itemRecords?.firstOrNull()?.itemId
         write("本批补记已撤销", {
@@ -191,6 +218,11 @@ class FitnessViewModel(
             statsFilter = filter; statsFlow.value = filter; statsByExercise = byExercise; statsMode.value = byExercise
         } catch (error: IllegalArgumentException) { notify(error.message.orEmpty()) }
     }
+    fun statsView(daily: Boolean, byExercise: Boolean = statsByExercise) {
+        statsDaily = daily; setStats(statsFilter, byExercise)
+    }
+    fun statsMetric(byDays: Boolean) { statsByDays = byDays }
+    fun statsOrder(fixed: Boolean) { statsFixedOrder = fixed }
 
     private fun refreshRecovery() {
         recoveryJob?.cancel()
@@ -219,7 +251,7 @@ class FitnessViewModel(
         pendingEditor = null
         draft = existing.copy(selectedDate = date?.takeIf { selected -> existing.plan.day(selected) != null } ?: existing.selectedDate, step = step ?: existing.step)
         draftDirty = true
-        loadHistory(existing.plan.id, after)
+        loadHistory(existing.plan.id) { queueDraft(); after() }
     }
 
     private fun loadHistory(planId: String, after: () -> Unit) = write("", { repository.planEvents(planId) }, after = { history ->
@@ -262,12 +294,26 @@ class FitnessViewModel(
         catch (error: IllegalArgumentException) { editorError = error.message; false }
     }
     fun updateDay(transform: (FitnessPlanDay) -> FitnessPlanDay) = updateDraft { current -> current.copy(plan = current.plan.copy(days = current.plan.days.map { if (it.date == current.selectedDate) transform(it) else it })) }
+    fun updateMeasurement(id: String, unit: FitnessUnit, side: FitnessSide) = updateDraft { current ->
+        require(editorHistory.none { it.itemId == id }) { "已有完成或撤销历史，计量口径不能修改" }
+        val day = requireNotNull(current.plan.day(current.selectedDate))
+        val item = day.activeItems.first { it.id == id }
+        if (item.exercise.unit == unit && item.exercise.side == side) return@updateDraft current
+        val raw = current.rawTargets[id] ?: FitnessTargetInput(item.targetSets?.toString().orEmpty(), item.targetValue?.toString().orEmpty())
+        current.copy(rawTargets = current.rawTargets + (id to raw.copy(value = "")), plan = current.plan.copy(days = current.plan.days.map {
+            if (it.date != day.date) it else it.copy(items = it.items.map { row ->
+                if (row.id != id) row else row.copy(exercise = row.exercise.copy(unit = unit, side = side), targetValue = null)
+            })
+        }))
+    }
     fun updateTarget(id: String, sets: String? = null, value: String? = null) = updateDraft { current ->
         val item = current.plan.days.flatMap { it.items }.first { it.id == id }
         val previous = current.rawTargets[id] ?: FitnessTargetInput(item.targetSets?.toString().orEmpty(), item.targetValue?.toString().orEmpty())
         val raw = previous.copy(sets = sets?.take(12) ?: previous.sets, value = value?.take(12) ?: previous.value)
         current.copy(rawTargets = current.rawTargets + (id to raw), plan = current.plan.copy(days = current.plan.days.map { day ->
-            day.copy(items = day.items.map { row -> if (row.id != id) row else row.copy(targetSets = raw.sets.toIntOrNull(), targetValue = raw.value.toIntOrNull()) })
+            day.copy(items = day.items.map { row -> if (row.id != id) row else row.copy(
+                targetSets = raw.sets.trim().takeIf { it.matches(Regex("[0-9]+")) }?.toIntOrNull(),
+                targetValue = raw.value.trim().takeIf { it.matches(Regex("[0-9]+")) }?.toIntOrNull()) })
         }))
     }
     fun toggleExercise(exercise: FitnessExercise) = updateDay { day ->
@@ -346,8 +392,10 @@ class FitnessViewModel(
     fun restore(after: () -> Unit) {
         val archive = pendingRestore ?: return
         draftJob?.cancel()
-        write("健身资料已恢复", { dependencies.backup.restore(archive) }, after = {
-            pendingRestore = null; draft = null; draftDirty = false; editorVisible = false; focusItemId = null; session = null
+        write("健身资料已恢复", { dependencies.backup.restore(archive); repository.currentData() }, after = { restored ->
+            pendingRestore = null; data = restored; draft = restored.draft; draftDirty = false; editorVisible = false; focusItemId = null; session = null; completionGuard = null
+            editorHistory = emptyList(); editorError = null; itemRecords = null; recordScope(null)
+            setStats(statsFilter.copy(planId = null))
             selectDate(today); after()
         })
     }
@@ -370,7 +418,7 @@ class FitnessViewModel(
             finally { busy = false }
         }
     }
-    override fun onCleared() { pendingRestore?.close(); super.onCleared() }
+    override fun onCleared() { pendingRestore?.close() }
 }
 
 class FitnessViewModelFactory(private val dependencies: FitnessFeatureDependencies) : ViewModelProvider.Factory {
