@@ -89,6 +89,9 @@ internal fun ElectricityCalculatorRoute(
         return
     }
 
+    viewModel.uiState.confirmation?.let { preview ->
+        ElectricityBillConfirmation(preview, viewModel.uiState.isSaving, viewModel.uiState.saveError, viewModel::confirmSave, viewModel::cancelSave)
+    }
     ElectricityCalculatorScreen(
         state = viewModel.uiState,
         onBack = requestExit,
@@ -101,7 +104,7 @@ internal fun ElectricityCalculatorRoute(
         onRemoveLastMeter = viewModel::requestRemoveLastMeter,
         onRemoveMeter = viewModel::requestRemoveMeter,
         onMeterChange = viewModel::updateMeter,
-        onConfirm = viewModel::saveBill,
+        onConfirm = viewModel::requestSave,
         onConfirmRemoval = viewModel::confirmRemoval,
         onDismissRemoval = viewModel::dismissRemoval,
         onDiscardAndExit = {
@@ -250,6 +253,7 @@ private fun ElectricityCalculatorScreen(
                         index = index,
                         meter = meter,
                         allocation = state.allocation?.shares?.getOrNull(index),
+                        total = state.allocation,
                         onRemove = { onRemoveMeter(meter.id) },
                         onChange = { transform -> onMeterChange(meter.id, transform) },
                         enabled = !state.isSaving,
@@ -481,6 +485,7 @@ private fun MeterCard(
     index: Int,
     meter: MeterDraft,
     allocation: MeterAllocation?,
+    total: com.pockettoolbox.feature.electricity.domain.ElectricityAllocation?,
     onRemove: () -> Unit,
     onChange: ((MeterDraft) -> MeterDraft) -> Unit,
     enabled: Boolean,
@@ -579,6 +584,7 @@ private fun MeterCard(
             }
 
             if (allocation != null) {
+                if (total != null) Text(com.pockettoolbox.feature.electricity.domain.allocationFormula(total.totalAmount, total.totalUsage, allocation.previousReading, allocation.currentReading, allocation.usage, allocation.amount), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 12.dp))
                 HorizontalDivider(modifier = Modifier.padding(top = 14.dp, bottom = 12.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),

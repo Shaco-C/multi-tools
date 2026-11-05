@@ -14,13 +14,13 @@ Pocket Toolbox combines **electricity bill splitting, dietary discomfort trackin
 
 ## Download and install
 
-The current stable release is **v1.2.0**, introducing home workout tracking.
+The current stable release is **v1.2.1**, introducing home workout tracking.
 
-- [Download the release APK](https://github.com/Shaco-C/multi-tools/releases/download/v1.2.0/multi-tools-v1.2.0.apk)
-- [Download the SHA-256 checksum](https://github.com/Shaco-C/multi-tools/releases/download/v1.2.0/multi-tools-v1.2.0.apk.sha256)
-- [Release notes](https://github.com/Shaco-C/multi-tools/releases/tag/v1.2.0) · [All releases](https://github.com/Shaco-C/multi-tools/releases)
+- [Download the release APK](https://github.com/Shaco-C/multi-tools/releases/download/v1.2.1/multi-tools-v1.2.1.apk)
+- [Download the SHA-256 checksum](https://github.com/Shaco-C/multi-tools/releases/download/v1.2.1/multi-tools-v1.2.1.apk.sha256)
+- [Release notes](https://github.com/Shaco-C/multi-tools/releases/tag/v1.2.1) · [All releases](https://github.com/Shaco-C/multi-tools/releases)
 
-Requires Android 8.0 or later. The release retains the `com.pockettoolbox` application ID and existing release signing certificate. Version code 3 supports upgrading v1.0.0 / v1.1.0 while retaining app data. Export each tool's backup before upgrading.
+Requires Android 8.0 or later. The release retains the `com.pockettoolbox` application ID and existing release signing certificate. Version code 4 supports upgrading v1.0.0 / v1.1.0 while retaining app data. Export each tool's backup before upgrading.
 
 Debug builds use `com.pockettoolbox.debug` and the launcher label “随身工具箱·测试版”. They can be installed alongside the release app and have independent storage. To move workout data from the test app to the release, export a fitness ZIP from the test app and restore it in the release.
 
@@ -83,10 +83,12 @@ cd android_app
 .\gradlew.bat :core:common:test :feature:electricity:testDebugUnitTest :feature:diet:testDebugUnitTest :feature:fitness:testDebugUnitTest :app:assembleDebug
 ```
 
+Current source is **1.2.1 stable**: preserved workout list positions, whole-plan copying, and electricity formulas with a save-confirmation preview. See the [implementation and validation record](docs/bug和优化项/1.2.1/实施与验证-20261105.md) (Chinese). The public stable release is v1.2.1; the table below describes current source builds.
+
 | Build | Launcher label | Application ID | Version name |
 | --- | --- | --- | --- |
-| Debug | 随身工具箱·测试版 | `com.pockettoolbox.debug` | `1.2.0-debug` |
-| Release | 随身工具箱 | `com.pockettoolbox` | `1.2.0` |
+| Debug | 随身工具箱·测试版 | `com.pockettoolbox.debug` | `1.2.1-debug` |
+| Release | 随身工具箱 | `com.pockettoolbox` | `1.2.1` |
 
 For signed release builds, create `android_app/keystore.properties` using the adjacent `.example` file. Signing keys, passwords, device databases, backups, and build outputs are excluded from Git.
 
@@ -103,3 +105,5 @@ Host tests cover domain rules, Room storage, backup and restore, ViewModels, and
 The app manifest does not request Internet access. Android source is in `android_app/`, documentation in `docs/`, and the web prototype in `prototype/`.
 
 Source exercise records and photos come from [yuhonas/free-exercise-db](https://github.com/yuhonas/free-exercise-db), pinned to a fixed revision under the Unlicense. Attribution and license files are included in the APK. See the [source ledger](content/fitness/sources/README.md) and [draft media attribution](content/fitness/pilot/README.md).
+
+[v1.2.1 Release notes / 发布说明](docs/release-notes-v1.2.1.md)

@@ -20,6 +20,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
+data class BillPreview(val month: String, val allocation: ElectricityAllocation)
+
 data class MeterDraft(
     val id: String,
     val label: String,
@@ -29,6 +31,7 @@ data class MeterDraft(
 )
 
 data class ElectricityCalculatorUiState(
+    val confirmation: BillPreview? = null,
     val billingMonth: String = YearMonth.now().toString(),
     val totalAmount: String = "",
     val meters: List<MeterDraft> = initialMeters(),
@@ -230,6 +233,18 @@ class ElectricityCalculatorViewModel(
         recalculate()
     }
 
+    fun requestSave() {
+        if (uiState.isSaving || uiState.isLoading || uiState.savedBillId != null) return
+        val allocation = uiState.allocation ?: return
+        uiState = uiState.copy(confirmation = BillPreview(uiState.billingMonth, allocation), saveError = null)
+    }
+    fun cancelSave() { if (!uiState.isSaving) uiState = uiState.copy(confirmation = null) }
+    fun confirmSave() {
+        val preview = uiState.confirmation ?: return
+        if (preview.month != uiState.billingMonth || preview.allocation != uiState.allocation) { cancelSave(); return }
+        saveBill()
+    }
+
     fun saveBill() {
         val allocation = uiState.allocation ?: return
         if (uiState.isSaving || uiState.savedBillId != null) return
@@ -257,6 +272,7 @@ class ElectricityCalculatorViewModel(
                     )
                 }
                 uiState = uiState.copy(
+                    confirmation = null,
                     savedBillId = saved.id,
                     isSaving = false,
                     saveError = null,
@@ -384,6 +400,7 @@ class ElectricityCalculatorViewModel(
     }
 
     private fun recalculate() {
+        uiState = uiState.copy(confirmation = null)
         val result = runCatching {
             require(uiState.billingMonth.isNotBlank()) { "请选择账单月份" }
             runCatching { YearMonth.parse(uiState.billingMonth) }

@@ -30,7 +30,7 @@ import kotlinx.coroutines.withContext
 data class FitnessNotice(val text: String, val undo: (() -> Unit)? = null)
 data class FitnessEditorRequest(val planId: String? = null, val date: String, val range: Boolean = false,
     val exerciseId: String? = null, val sourceDay: FitnessPlanDay? = null, val step: Int? = null,
-    val targetSets: Int? = null, val targetValue: Int? = null, val overwrite: Boolean = false)
+    val targetSets: Int? = null, val targetValue: Int? = null, val overwrite: Boolean = false, val sourcePlanId: String? = null)
 data class FitnessDaySelection(val date: String, val planId: String? = null)
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -238,7 +238,7 @@ class FitnessViewModel(
         if (busy) return
         val existing = draft ?: data.draft
         if (existing != null && (request.planId != null && existing.editing && existing.plan.id == request.planId ||
-            request.planId == null && request.exerciseId == null && request.sourceDay == null && !request.range && !existing.editing && existing.entrySource == "day" && existing.plan.start == request.date && existing.plan.end == request.date)) {
+            request.planId == null && request.sourcePlanId == null && request.exerciseId == null && request.sourceDay == null && !request.range && !existing.editing && existing.entrySource == "day" && existing.plan.start == request.date && existing.plan.end == request.date)) {
             resumeEditor({ applyEditorIntent(request); after() }, request.date, request.step)
         } else if (existing != null) pendingEditor = request
         else beginEditor(request, after)
@@ -261,7 +261,8 @@ class FitnessViewModel(
     private fun beginEditor(request: FitnessEditorRequest, after: () -> Unit) {
         try {
             val old = request.planId?.let { id -> data.plans.firstOrNull { it.id == id } }
-            val plan = old ?: FitnessRules.newPlan(request.date, if (request.range) FitnessRules.date(request.date).plusDays(1).toString() else request.date)
+            val sourcePlan = request.sourcePlanId?.let { id -> requireNotNull(data.plans.firstOrNull { it.id == id }) { "来源计划已不存在" } }
+            val plan = sourcePlan?.let { FitnessPlanCopy.copy(it, request.date) } ?: old ?: FitnessRules.newPlan(request.date, if (request.range) FitnessRules.date(request.date).plusDays(1).toString() else request.date)
             val date = request.date.takeIf { plan.day(it) != null } ?: plan.start
             draft = FitnessDraft(plan, old != null, date, request.step ?: if (old == null && !request.range) 1 else 0,
                 clock.millis(), entrySource = if (request.exerciseId == null && request.sourceDay == null && !request.range && old == null) "day" else "other")

@@ -31,6 +31,7 @@ internal fun LazyListScope.fitnessEditor(vm: FitnessViewModel, onPick: (String) 
     }
     if (draft.step == 0) item("editor-range") {
         FitnessCard {
+            if (!draft.editing) FitnessCopyPlanControl(vm)
             OutlinedTextField(plan.name, { text -> vm.updateDraft { it.copy(plan = it.plan.copy(name = text.take(60))) } }, label = { Text("计划名称") }, singleLine = true, enabled = !vm.busy, modifier = Modifier.fillMaxWidth())
             FitnessDateField("开始日期", plan.start, enabled = !vm.busy) { value -> vm.updateDraft { it.copy(plan = it.plan.copy(start = value)) } }
             FitnessDateField("结束日期", plan.end, enabled = !vm.busy) { value -> vm.updateDraft { it.copy(plan = it.plan.copy(end = value)) } }
@@ -82,6 +83,7 @@ internal fun LazyListScope.fitnessEditor(vm: FitnessViewModel, onPick: (String) 
         items(day.activeItems, key = { "edit-${it.id}" }) { row -> FitnessCard {
             val exercise = vm.exercises.firstOrNull { it.id == row.exercise.exerciseId }
             if (exercise != null) FitnessExerciseRow(vm, exercise.copy(unit = row.exercise.unit, side = row.exercise.side), { onDetail(exercise.id) }) else Text(row.exercise.name)
+            if (exercise == null || exercise.archived) FitnessHint("原动作已停用或不在动作库；保留原安排，请核对或移除后重新选择。")
             val measurementLocked = vm.editorHistory.any { it.itemId == row.id }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Box(Modifier.weight(1f)) { FitnessChoice("计量单位", row.exercise.unit.name, FitnessUnit.entries.map { it.name to it.label },

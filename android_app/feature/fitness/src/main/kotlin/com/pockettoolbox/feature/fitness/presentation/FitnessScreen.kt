@@ -80,6 +80,8 @@ fun FitnessRoute(dependencies: FitnessFeatureDependencies, onExit: () -> Unit,
     val planDetailList = rememberLazyListState()
     val editorList = rememberLazyListState()
     val detailList = rememberLazyListState()
+    val sourceDetailList = rememberLazyListState()
+    var resetDetail by rememberSaveable { mutableStateOf(false) }
     val statsList = rememberLazyListState()
     val manageList = rememberLazyListState()
     val libraryList = rememberLazyListState()
@@ -89,13 +91,13 @@ fun FitnessRoute(dependencies: FitnessFeatureDependencies, onExit: () -> Unit,
     val focusManager = LocalFocusManager.current
 
     fun listFor(destination: String) = when (destination) {
-        "Plans" -> plansList; "PlanDetail" -> planDetailList; "Editor" -> editorList; "Detail", "SourceDetail" -> detailList
+        "Plans" -> plansList; "PlanDetail" -> planDetailList; "Editor" -> editorList; "Detail" -> detailList; "SourceDetail" -> sourceDetailList
         "Stats" -> statsList; "Manage" -> manageList; else -> homeList
     }
     val mainList = listFor(page)
 
     fun editor(request: FitnessEditorRequest) { vm.requestEditor(request) { page = "Editor"; scope.launch { editorList.scrollToItem(0) } } }
-    fun detail(id: String, origin: String = page) { focusManager.clearFocus(); detailOrigin = origin; detailId = id; page = "Detail"; scope.launch { detailList.scrollToItem(0) } }
+    fun detail(id: String, origin: String = page) { focusManager.clearFocus(); detailOrigin = origin; detailId = id; resetDetail = true; page = "Detail" }
     fun openPlan(id: String, selectedDate: String, origin: String = page) {
         planId = id; date = selectedDate; planOrigin = origin; vm.selectDate(date, id); page = "PlanDetail"; scope.launch { planDetailList.scrollToItem(0) }
     }
@@ -147,6 +149,18 @@ fun FitnessRoute(dependencies: FitnessFeatureDependencies, onExit: () -> Unit,
         if (vm.loaded) vm.recordScope(if (scopedTitle != null) scopedScope else null)
     }
     LaunchedEffect(vm.draft?.plan?.id, vm.draft?.step) { if (page == "Editor") editorList.scrollToItem(0) }
+    LaunchedEffect(page, detailId) { if (page == "Detail" && resetDetail) { detailList.scrollToItem(0); resetDetail = false } }
+    // Keep navigation return positions, but reset when the result set itself changes.
+    val pickerContext = listOf(vm.draft?.plan?.id, vm.draft?.selectedDate, pickerScope, pickerQuery, pickerMine, pickerSource, pickerSelected).joinToString("|")
+    var previousPickerContext by rememberSaveable { mutableStateOf(pickerContext) }
+    LaunchedEffect(pickerContext) {
+        if (previousPickerContext != pickerContext) { pickerList.scrollToItem(0); previousPickerContext = pickerContext }
+    }
+    val libraryContext = listOf(category, libraryMode, query, mine, sourceFilter, includeSecondary).joinToString("|")
+    var previousLibraryContext by rememberSaveable { mutableStateOf(libraryContext) }
+    LaunchedEffect(libraryContext) {
+        if (previousLibraryContext != libraryContext) { libraryList.scrollToItem(0); previousLibraryContext = libraryContext }
+    }
     BackHandler { back() }
 
     val title = when (page) {
@@ -184,7 +198,7 @@ fun FitnessRoute(dependencies: FitnessFeatureDependencies, onExit: () -> Unit,
                 } else if (!vm.loaded) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                 else {
                     val state = when (page) { "LibraryList", "Search" -> libraryList; "Picker" -> pickerList; "Sources" -> sourceList; else -> mainList }
-                    LazyColumn(Modifier.weight(1f).fillMaxWidth().testTag("fitness-page"), state = state,
+                    key(page) { LazyColumn(Modifier.weight(1f).fillMaxWidth().testTag("fitness-page"), state = state,
                         contentPadding = PaddingValues(top = 12.dp, bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                         if (page == "Today") fitnessToday(vm, date,
                             onDate = { date = it; vm.selectDate(it) }, onEditor = ::editor,
@@ -234,6 +248,7 @@ fun FitnessRoute(dependencies: FitnessFeatureDependencies, onExit: () -> Unit,
                         if (page == "Sources") fitnessSources(vm, sourceQuery, sourceLimit,
                             onQuery = { sourceQuery = it; sourceLimit = 30 }, onMore = { sourceLimit += 30 }, onDetail = { sourceId = it; page = "SourceDetail" })
                         if (page == "SourceDetail") fitnessSourceDetail(vm, sourceId, onCustom = { custom(raw = it) }, onLinked = { detail(it, "SourceDetail") })
+                    }
                     }
                     if (page == "Picker") {
                         val count = vm.draft?.let { it.plan.day(it.selectedDate)?.activeItems?.size } ?: 0

@@ -196,6 +196,7 @@ private fun ElectricityBillDetailScreen(
                         ShareDetailCard(
                             share = share,
                             totalUsage = bill.totalUsage,
+                            totalAmount = bill.totalAmount,
                             modifier = Modifier.padding(bottom = 12.dp),
                         )
                     }
@@ -242,6 +243,7 @@ private fun BillSummary(bill: ElectricityBillRecord) {
 private fun ShareDetailCard(
     share: ElectricityShareRecord,
     totalUsage: java.math.BigDecimal,
+    totalAmount: com.pockettoolbox.core.common.money.Money,
     modifier: Modifier = Modifier,
 ) {
     Card(
@@ -266,6 +268,7 @@ private fun ShareDetailCard(
                 }
                 Text("¥ ${share.allocatedAmount.formatYuan()}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold)
             }
+            Text(com.pockettoolbox.feature.electricity.domain.allocationFormula(totalAmount, totalUsage, share.previousReading, share.currentReading, share.usage, share.allocatedAmount), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
             HorizontalDivider(Modifier.padding(vertical = 12.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("上期 ${share.previousReading.stripTrailingZeros().toPlainString()}", style = MaterialTheme.typography.bodySmall)

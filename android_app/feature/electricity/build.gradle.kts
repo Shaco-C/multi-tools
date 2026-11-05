@@ -23,6 +23,16 @@ android {
     buildFeatures {
         compose = true
     }
+    testOptions.unitTests {
+        isIncludeAndroidResources = true
+        all {
+            it.systemProperty("user.home", gradle.gradleUserHomeDir.absolutePath)
+            it.systemProperty("java.io.tmpdir", gradle.gradleUserHomeDir.resolve("robolectric/tmp").apply { mkdirs() }.absolutePath)
+            it.systemProperty("maven.repo.local", gradle.gradleUserHomeDir.resolve("robolectric/repository").absolutePath)
+            it.systemProperty("robolectric.dependency.repo.url", "https://repo.maven.apache.org/maven2")
+            it.systemProperty("electricity.screenshot.dir", layout.buildDirectory.dir("reports/electricity-ui").get().asFile.absolutePath)
+        }
+    }
 }
 
 room {
@@ -51,6 +61,12 @@ dependencies {
     ksp(libs.androidx.room.compiler)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
+    testImplementation(libs.androidx.test.core)
+    testImplementation(libs.androidx.test.ext.junit)
+    testImplementation("org.robolectric:robolectric:4.17")
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    testImplementation("androidx.test.espresso:espresso-core:3.7.0")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
     testImplementation(libs.junit4)
     testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.junit4)

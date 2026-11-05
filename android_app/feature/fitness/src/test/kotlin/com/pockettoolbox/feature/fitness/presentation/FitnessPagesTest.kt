@@ -39,6 +39,7 @@ class FitnessPagesTest {
     private val restoration = StateRestorationTester(compose)
     private val store = ViewModelStore()
     private lateinit var database: FitnessDatabase
+    private lateinit var backDispatcher: androidx.activity.OnBackPressedDispatcher
     private lateinit var vm: FitnessViewModel
     private val clock = Clock.fixed(Instant.parse("2026-10-24T12:00:00Z"), ZoneId.of("Asia/Shanghai"))
     @After fun close() { store.clear(); if (::database.isInitialized) database.close() }
@@ -62,7 +63,10 @@ class FitnessPagesTest {
             }
         }
         compose.runOnUiThread { vm = FitnessViewModel(dependencies, clock); store.put("fitness", vm) }
-        restoration.setContent { PocketToolboxTheme(palette) { FitnessRoute(dependencies, {}, vm) } }
+        restoration.setContent {
+            backDispatcher = requireNotNull(androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
+            PocketToolboxTheme(palette) { FitnessRoute(dependencies, {}, vm) }
+        }
         awaitData { vm.loaded && (!recorded || vm.statsCounts.isNotEmpty()) }
         compose.onNodeWithText("今天的训练").assertExists()
     }
@@ -89,6 +93,97 @@ class FitnessPagesTest {
                 try { decor.draw(android.graphics.Canvas(bitmap)) } finally { bitmap.recycle() }
             }
         } finally { compose.mainClock.autoAdvance = true }
+    }
+
+    @Test fun copyingPlanProtectsDraftAndSavesIndependentPlanWithoutHistory() {
+        open(ToolboxPalette.Fresh, true)
+        val original = vm.data.plans.single()
+        val originalEvents = runBlocking { vm.dependencies.repository.snapshot() }.events
+        compose.onNodeWithText("创建多日计划").performClick()
+        awaitData { vm.draft != null && !vm.busy }
+        val previousDraft = vm.draft!!.plan.id
+        compose.onNodeWithTag("fitness-page").performScrollToNode(hasText("从历史计划中复制"))
+        openDialogAndDraw { compose.onNodeWithText("从历史计划中复制").performClick() }
+        compose.onNodeWithText("请选择").performClick()
+        compose.onNodeWithText("${original.name} · ${original.start}—${original.end}").performClick()
+        openDialogAndDraw { compose.onNodeWithText("复制并调整").performClick() }
+        compose.onNodeWithText("先处理未完成草稿").assertExists()
+        assertEquals(previousDraft, vm.draft!!.plan.id)
+        compose.onNodeWithText("取消").performClick()
+        assertEquals(previousDraft, vm.draft!!.plan.id)
+        // Re-request and explicitly replace; the new plan remains only a draft.
+        openDialogAndDraw { compose.runOnIdle { vm.requestEditor(FitnessEditorRequest(date = "2026-11-08", range = true, sourcePlanId = original.id)) {} } }
+        compose.onNodeWithText("替换草稿").performClick()
+        awaitData { !vm.busy && vm.draft!!.plan.id != previousDraft }
+        val copy = vm.draft!!.plan
+        assertEquals("2026-11-08", copy.start)
+        assertTrue(vm.editorHistory.isEmpty())
+        assertFalse(vm.draft!!.editing)
+        assertEquals(1, runBlocking { vm.dependencies.repository.snapshot() }.data.plans.size)
+        compose.runOnIdle { vm.updateDraft { it.copy(plan = it.plan.copy(name = "复制后微调")) }; vm.savePlan {} }
+        awaitData { !vm.busy && vm.draft == null && vm.data.plans.size == 2 }
+        val snapshot = runBlocking { vm.dependencies.repository.snapshot() }
+        assertEquals(original, snapshot.data.plans.first { it.id == original.id })
+        assertEquals(originalEvents, snapshot.events)
+        assertEquals("复制后微调", snapshot.data.plans.first { it.id == copy.id }.name)
+        assertNotEquals(original.days.single().items.first().id, copy.days.single().items.first().id)
+    }
+
+    @Test fun pickerReturnsToSameExerciseAndOffsetAfterDetailsAndAdding() {
+        open(ToolboxPalette.Fresh, false)
+        compose.onNodeWithText("创建多日计划").performClick()
+        awaitData { vm.draft != null && !vm.busy }
+        compose.runOnIdle { vm.updateDraft { it.copy(step = 2) }; vm.updateDay { it.copy(kind = FitnessDayKind.Training, parts = listOf(FitnessPart.Chest)) } }
+        compose.onNodeWithTag("fitness-page").performScrollToNode(hasText("胸部 · 已选0个"))
+        compose.onNodeWithText("胸部 · 已选0个").performClick()
+        compose.onNodeWithTag("fitness-page").performScrollToNode(hasText("加载更多", substring = true))
+        compose.onNodeWithText("加载更多", substring = true).performClick()
+        val target = vm.exercises.filter { it.purpose == FitnessPurpose.Strength && it.primaryPart == FitnessPart.Chest }[25]
+        val matcher = hasTestTag("fitness-exercise-${target.id}")
+        compose.onNodeWithTag("fitness-page").performScrollToNode(matcher)
+        val before = compose.onNode(matcher).fetchSemanticsNode().boundsInRoot.top
+        repeat(2) { index ->
+            compose.onNode(matcher).performClick()
+            if (index == 0) compose.onNodeWithContentDescription("返回", useUnmergedTree = true).performClick()
+            else compose.runOnUiThread { backDispatcher.onBackPressed() }
+            compose.onNode(matcher).assertIsDisplayed()
+            assertEquals(before, compose.onNode(matcher).fetchSemanticsNode().boundsInRoot.top, 1f)
+        }
+        compose.onNode(matcher).performClick()
+        compose.onNodeWithTag("fitness-page").performScrollToNode(hasText("返回选择（未选则加入）"))
+        compose.onNodeWithText("返回选择（未选则加入）").performClick()
+        compose.onNode(matcher).assertIsDisplayed()
+        assertEquals(before, compose.onNode(matcher).fetchSemanticsNode().boundsInRoot.top, 1f)
+        assertEquals(1, vm.draft!!.plan.day(vm.draft!!.selectedDate)!!.activeItems.count { it.exercise.exerciseId == target.id })
+        screenshot("picker-return-position")
+    }
+
+    @Test fun libraryAndEditorPositionsSurviveDetailsAndStateRestoration() {
+        open(ToolboxPalette.Fresh, true, itemCount = 8)
+        compose.onNodeWithText("动作库", useUnmergedTree = true).performClick()
+        compose.onNodeWithText("胸部").performClick()
+        val exercise = vm.exercises.filter { it.purpose == FitnessPurpose.Strength && it.primaryPart == FitnessPart.Chest }[15]
+        val matcher = hasTestTag("fitness-exercise-${exercise.id}")
+        compose.onNodeWithTag("fitness-page").performScrollToNode(matcher)
+        val before = compose.onNode(matcher).fetchSemanticsNode().boundsInRoot.top
+        compose.onNode(matcher).performClick()
+        compose.onNodeWithTag("fitness-page").performScrollToNode(hasText("加入我的计划"))
+        restoration.emulateSavedInstanceStateRestore()
+        compose.onNodeWithText("加入我的计划").assertIsDisplayed()
+        compose.runOnUiThread { backDispatcher.onBackPressed() }
+        assertEquals(before, compose.onNode(matcher).fetchSemanticsNode().boundsInRoot.top, 1f)
+        val original = vm.data.plans.single()
+        compose.onNodeWithText("创建多日计划").assertDoesNotExist()
+        compose.onNodeWithText("今日", useUnmergedTree = true).performClick()
+        compose.onNodeWithText("创建多日计划").performClick()
+        awaitData { vm.draft != null && !vm.busy }
+        compose.runOnIdle { vm.updateDraft { it.copy(plan = original, selectedDate = original.start, step = 2) } }
+        val editorMatcher = hasTestTag("fitness-exercise-${original.days.single().items.last().exercise.exerciseId}")
+        compose.onNodeWithTag("fitness-page").performScrollToNode(editorMatcher)
+        val editorBefore = compose.onNode(editorMatcher).fetchSemanticsNode().boundsInRoot.top
+        compose.onNode(editorMatcher).performClick()
+        compose.onNodeWithContentDescription("返回", useUnmergedTree = true).performClick()
+        assertEquals(editorBefore, compose.onNode(editorMatcher).fetchSemanticsNode().boundsInRoot.top, 1f)
     }
 
     @Test fun freshThemeNavigationConnectsStatisticsToOriginalDay() {

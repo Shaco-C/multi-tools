@@ -27,6 +27,48 @@ class ElectricityCalculatorViewModelTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
+    @Test fun failedConfirmationKeepsPreviewAndFormForRetry() {
+        val vm = validViewModel(FakeRepository(failure = IllegalStateException("磁盘写入失败")))
+        vm.requestSave()
+        val preview = vm.uiState.confirmation
+        vm.confirmSave()
+        assertEquals(preview, vm.uiState.confirmation)
+        assertEquals(preview!!.allocation, vm.uiState.allocation)
+        assertFalse(vm.uiState.isSaving)
+        assertNotNull(vm.uiState.saveError)
+        assertNull(vm.uiState.savedBillId)
+    }
+
+    @Test fun previewRequiresConfirmationAndCancelKeepsInput() {
+        val repository = FakeRepository()
+        val vm = validViewModel(repository)
+        vm.requestSave()
+        val preview = vm.uiState.confirmation!!
+        assertEquals(0, repository.saveCount)
+        vm.cancelSave()
+        assertEquals(preview.allocation, vm.uiState.allocation)
+        vm.requestSave()
+        vm.confirmSave()
+        vm.confirmSave()
+        assertEquals(1, repository.saveCount)
+        assertEquals(preview.allocation, repository.lastRequest!!.allocation)
+    }
+    @Test fun changedInputInvalidatesOldPreviewAndInvalidDataCannotOpenIt() {
+        val repository = FakeRepository()
+        val vm = validViewModel(repository)
+        vm.requestSave()
+        vm.updateTotalAmount("120.00")
+        assertNull(vm.uiState.confirmation)
+        vm.confirmSave()
+        assertEquals(0, repository.saveCount)
+        vm.requestSave()
+        assertEquals(12000L, vm.uiState.confirmation!!.allocation.totalAmount.cents)
+        vm.cancelSave()
+        vm.updateTotalAmount("")
+        vm.requestSave()
+        assertNull(vm.uiState.confirmation)
+    }
+
     @Test
     fun `初始空表单不显示为已编辑`() {
         val viewModel = ElectricityCalculatorViewModel(FakeRepository())

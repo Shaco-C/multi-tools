@@ -31,7 +31,7 @@
 
 前往 [GitHub Releases](https://github.com/Shaco-C/multi-tools/releases/latest) 下载最新正式版 APK。应用最低支持 Android 8.0（API 26）。
 
-当前正式版 **v1.2.0**，新增居家健身。可直接 [下载正式版 APK](https://github.com/Shaco-C/multi-tools/releases/download/v1.2.0/multi-tools-v1.2.0.apk)、[SHA-256校验文件](https://github.com/Shaco-C/multi-tools/releases/download/v1.2.0/multi-tools-v1.2.0.apk.sha256)，或查看 [本版更新说明](https://github.com/Shaco-C/multi-tools/releases/tag/v1.2.0)。沿用既有正式签名，versionCode升至3，可覆盖升级v1.0.0 / v1.1.0并保留本机数据；更新前建议分别导出各工具备份。
+当前正式版 **v1.2.1**，完善训练计划复用和电费账单确认。可直接 [下载正式版 APK](https://github.com/Shaco-C/multi-tools/releases/download/v1.2.1/multi-tools-v1.2.1.apk)、[SHA-256校验文件](https://github.com/Shaco-C/multi-tools/releases/download/v1.2.1/multi-tools-v1.2.1.apk.sha256)，或查看 [本版更新说明](https://github.com/Shaco-C/multi-tools/releases/tag/v1.2.1)。沿用既有正式签名，versionCode升至4，可覆盖升级v1.0.0 / v1.1.0并保留本机数据；更新前建议分别导出各工具备份。
 
 ## 已有功能
 
@@ -83,10 +83,12 @@ Windows 环境建议从不含中文的入口路径打开工程，例如本机使
 
 测试版和正式版使用不同包名，可以在同一部手机上同时安装：
 
+当前源码为 **1.2.1 正式版**：修复动作详情返回位置、新增整份历史计划复制、电费算式与保存确认。见[实施与验证](docs/bug和优化项/1.2.1/实施与验证-20261105.md)。公开正式版更新为1.2.1；下表为当前源码的构建配置。
+
 | 构建 | 手机显示名称 | 包名 | 版本名称 |
 | --- | --- | --- | --- |
-| Debug | 随身工具箱·测试版 | `com.pockettoolbox.debug` | `1.2.0-debug` |
-| Release | 随身工具箱 | `com.pockettoolbox` | `1.2.0` |
+| Debug | 随身工具箱·测试版 | `com.pockettoolbox.debug` | `1.2.1-debug` |
+| Release | 随身工具箱 | `com.pockettoolbox` | `1.2.1` |
 
 两者的数据库、个人图片和主题设置各自独立；安装或卸载测试版不会覆盖正式版的数据。测试版首次安装为空数据，需要已有记录时，可在正式版导出对应工具的备份，再到测试版手动导入。后续Debug包沿用同一测试包名与本机Debug签名，可覆盖升级测试版并保留测试数据。
 
@@ -126,3 +128,5 @@ cd android_app
 来源动作与原图来自 [yuhonas/free-exercise-db](https://github.com/yuhonas/free-exercise-db)，使用固定版本与Unlicense；出处和授权文件随APK分发。版本、哈希与来源见 [素材来源台账](content/fitness/sources/README.md)，中文样稿和肌肉图见 [样稿素材说明](content/fitness/pilot/README.md)。
 
 饮食统计只描述已记录的餐后不适关联，不计算发生率、不判断原因，也不会将未记录的食品标记为安全。使用与验收步骤见 [饮食不适工具实施记录](docs/饮食不适工具实施记录-20261002.md)。
+
+[v1.2.1 Release notes / 发布说明](docs/release-notes-v1.2.1.md)
